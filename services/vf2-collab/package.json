@@ -1,0 +1,25 @@
+{
+  "name": "vf2-collab",
+  "version": "1.0.0",
+  "description": "Servidor de co-edición Hocuspocus/Yjs para NuVerdis vf2_",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js"
+  },
+  "dependencies": {
+    "@hocuspocus/server": "^2.13.4",
+    "@hocuspocus/extension-database": "^2.13.4",
+    "jose": "^5.9.6",
+    "@supabase/supabase-js": "^2.49.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.4.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
