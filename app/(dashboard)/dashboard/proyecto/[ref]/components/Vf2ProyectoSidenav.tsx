@@ -68,10 +68,21 @@ export default function Vf2ProyectoSidenav({
     return acc
   }, {})
 
+  // Un proyecto admite UNA colección por estándar (constraint único en BD).
+  const usados = new Set(colecciones.map(c => c.estandar))
+  const disponibles = ESTANDARES.filter(e => !usados.has(e))
+  const sinDisponibles = disponibles.length === 0
+
+  function handleOpen() {
+    // Preseleccionar el primer estándar disponible
+    if (disponibles.length > 0) setEstandar(disponibles[0])
+    setError(null)
+    setModalOpen(true)
+  }
+
   function handleClose() {
     setModalOpen(false)
     setNombre('')
-    setEstandar('GRI')
     setError(null)
   }
 
@@ -129,9 +140,9 @@ export default function Vf2ProyectoSidenav({
               <span className="text-xs font-semibold text-gray-4 uppercase tracking-wide">
                 Colecciones
               </span>
-              {esAdmin && (
+              {esAdmin && !sinDisponibles && (
                 <button
-                  onClick={() => setModalOpen(true)}
+                  onClick={handleOpen}
                   className="text-gray-3 hover:text-primary-6 transition-colors"
                   title="Nueva colección"
                 >
@@ -145,7 +156,7 @@ export default function Vf2ProyectoSidenav({
                 <p className="text-xs text-gray-3">Sin colecciones.</p>
                 {esAdmin && (
                   <button
-                    onClick={() => setModalOpen(true)}
+                    onClick={handleOpen}
                     className="mt-1 text-xs text-primary-5 hover:text-primary-7 underline underline-offset-2"
                   >
                     Crear la primera
@@ -216,21 +227,31 @@ export default function Vf2ProyectoSidenav({
                   Estándar
                 </label>
                 <div className="flex gap-2">
-                  {ESTANDARES.map(e => (
-                    <button
-                      key={e}
-                      type="button"
-                      onClick={() => setEstandar(e)}
-                      className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${
-                        estandar === e
-                          ? 'border-primary-5 bg-primary-1 text-primary-7'
-                          : 'border-gray-3 text-gray-6 hover:border-gray-4'
-                      }`}
-                    >
-                      {e}
-                    </button>
-                  ))}
+                  {ESTANDARES.map(e => {
+                    const yaExiste = usados.has(e)
+                    return (
+                      <button
+                        key={e}
+                        type="button"
+                        disabled={yaExiste}
+                        onClick={() => setEstandar(e)}
+                        title={yaExiste ? `Ya existe una colección ${e} en este proyecto` : undefined}
+                        className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                          yaExiste
+                            ? 'border-gray-2 bg-gray-1 text-gray-3 cursor-not-allowed'
+                            : estandar === e
+                            ? 'border-primary-5 bg-primary-1 text-primary-7'
+                            : 'border-gray-3 text-gray-6 hover:border-gray-4'
+                        }`}
+                      >
+                        {e}
+                      </button>
+                    )
+                  })}
                 </div>
+                <p className="text-[11px] text-gray-4 mt-1">
+                  Un proyecto admite una colección por estándar.
+                </p>
               </div>
 
               <div>

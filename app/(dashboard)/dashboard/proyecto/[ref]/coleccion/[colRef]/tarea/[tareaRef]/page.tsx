@@ -6,6 +6,9 @@ import { requireSession } from '@/lib/supabase/auth-guard'
 import Vf2TareaView from '@/app/(dashboard)/dashboard/vf2/components/Vf2TareaView'
 import type { Vf2Tarea, Vf2TareaRolRow, Vf2Sheet, Vf2Cell, Vf2Coleccion, Vf2Metric, Vf2Evidencia } from '@/lib/vf2/types'
 
+// Detalle de tarea en vivo (celdas, roles, evidencias): nunca servir desde caché.
+export const dynamic = 'force-dynamic'
+
 export default async function TareaPage({
   params,
 }: {

@@ -9,6 +9,9 @@ import { VF2_ESTADO_BADGE, VF2_ESTADO_LABEL } from '@/lib/vf2/permisos'
 import Vf2CrearTareaModal from '@/app/(dashboard)/dashboard/vf2/components/Vf2CrearTareaModal'
 import type { Vf2Coleccion, Vf2Tarea } from '@/lib/vf2/types'
 
+// Lista de tareas en vivo: nunca servir desde caché.
+export const dynamic = 'force-dynamic'
+
 interface TareaConItem extends Vf2Tarea {
   gri_item?: { estandar: string; jerarquia_1_nombre: string; jerarquia_2_nombre: string | null } | null
   ncg_item?: { jerarquia_1: string; jerarquia_1_nombre: string; jerarquia_2_nombre: string | null } | null

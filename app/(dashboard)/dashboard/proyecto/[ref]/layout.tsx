@@ -8,6 +8,9 @@ import { requireSession } from '@/lib/supabase/auth-guard'
 import { getCurrentEmpresa, getProyectoByRef } from '@/lib/proyecto/data'
 import Vf2ProyectoSidenav from './components/Vf2ProyectoSidenav'
 
+// Datos en vivo del proyecto (colecciones, estados): nunca servir desde caché.
+export const dynamic = 'force-dynamic'
+
 interface Coleccion {
   public_id: string
   nombre: string
