@@ -42,17 +42,11 @@ export async function vf2CrearColeccion(
 
     if (!proyecto) return { ok: false, error: 'Proyecto no encontrado' }
 
-    const { data, error } = await supabase
-      .from('vf2_coleccion')
-      .insert({
-        empresa_id: actor.empresaId,
-        proyecto_id: parsed.data.proyectoId,
-        estandar: parsed.data.estandar,
-        nombre: parsed.data.nombre,
-        estado: 'activa',
-      })
-      .select('coleccion_id, public_id, nombre, estandar, estado')
-      .single()
+    const { data, error } = await supabase.rpc('vf2_crear_coleccion', {
+      p_proyecto_id: parsed.data.proyectoId,
+      p_estandar: parsed.data.estandar,
+      p_nombre: parsed.data.nombre,
+    })
 
     if (error) {
       console.error('[vf2-tareas] vf2CrearColeccion:', error.message)
@@ -60,7 +54,7 @@ export async function vf2CrearColeccion(
     }
 
     revalidatePath('/dashboard/vf2', 'layout')
-    return { ok: true, data: { ok: true, coleccion_id: data.coleccion_id, public_id: data.public_id } }
+    return { ok: true, data: data as Vf2CrearColeccionResult }
   } catch {
     return { ok: false, error: 'Error al procesar la solicitud' }
   }
