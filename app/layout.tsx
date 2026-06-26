@@ -34,6 +34,8 @@ export default function RootLayout({
       >
         {children}
         <ToastProvider />
+        {/* Portal requerido por glide-data-grid: aloja el overlay de edición de celdas (vf2 grid). */}
+        <div id="portal" style={{ position: "fixed", left: 0, top: 0, zIndex: 60 }} />
       </body>
     </html>
   );
