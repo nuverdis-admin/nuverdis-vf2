@@ -201,7 +201,7 @@ export async function vf2GuardarCeldas(
     const actor = await requireSession()
     const supabase = await createClient()
 
-    // Verificar sheet pertenece a empresa
+    // Verificar sheet pertenece a empresa (doble muralla)
     const { data: sheet } = await supabase
       .from('vf2_sheet')
       .select('sheet_id, tarea_id')
@@ -211,7 +211,7 @@ export async function vf2GuardarCeldas(
 
     if (!sheet) return { ok: false, error: 'Hoja no encontrada' }
 
-    // Upsert de celdas en batch
+    // Upsert de celdas en batch — incluye validation para coordenada por celda
     const rows = parsed.data.cells.map(c => ({
       empresa_id: actor.empresaId,
       sheet_id: sheet.sheet_id,
@@ -220,6 +220,7 @@ export async function vf2GuardarCeldas(
       value_num: c.valueNum ?? null,
       value_text: c.valueText ?? null,
       value_json: c.valueJson ?? null,
+      ...(c.validation ? { validation: c.validation } : {}),
       estado_celda: 'borrador' as const,
     }))
 
@@ -247,8 +248,18 @@ export async function vf2CambiarEstado(
   if (!parsed.success) return { ok: false, error: 'Datos inválidos' }
 
   try {
-    await requireSession()
+    const actor = await requireSession()
     const supabase = await createClient()
+
+    // Doble muralla app-level: verificar tarea pertenece a empresa antes del RPC
+    const { data: tarea } = await supabase
+      .from('vf2_tarea')
+      .select('tarea_id')
+      .eq('public_id', parsed.data.tareaPublicId)
+      .eq('empresa_id', actor.empresaId)
+      .single()
+
+    if (!tarea) return { ok: false, error: 'Tarea no encontrada' }
 
     const { data, error } = await supabase.rpc('vf2_cambiar_estado_tarea', {
       p_tarea_public_id: parsed.data.tareaPublicId,
@@ -277,8 +288,18 @@ export async function vf2Aprobar(
   if (!parsed.success) return { ok: false, error: 'Datos inválidos' }
 
   try {
-    await requireSession()
+    const actor = await requireSession()
     const supabase = await createClient()
+
+    // Doble muralla app-level: verificar tarea pertenece a empresa antes del RPC
+    const { data: tarea } = await supabase
+      .from('vf2_tarea')
+      .select('tarea_id')
+      .eq('public_id', parsed.data.tareaPublicId)
+      .eq('empresa_id', actor.empresaId)
+      .single()
+
+    if (!tarea) return { ok: false, error: 'Tarea no encontrada' }
 
     const { data, error } = await supabase.rpc('vf2_aprobar_tarea', {
       p_tarea_public_id: parsed.data.tareaPublicId,

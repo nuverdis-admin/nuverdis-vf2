@@ -40,6 +40,14 @@ export const vf2AsignarRolSchema = z.object({
   { message: 'Debe asignarse a usuario O equipo, no ambos' }
 )
 
+// Coordenada de una celda (se guarda en vf2_cell.validation)
+export const vf2CellValidationInputSchema = z.object({
+  metric_id: z.number().int().positive().optional(),
+  periodo_inicio: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  periodo_fin: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  dims: z.record(z.string(), z.string()).optional(),
+}).optional()
+
 // Guardar celdas (autosave desde el grid)
 export const vf2CellValueSchema = z.object({
   rowKey: z.string().min(1).max(100),
@@ -47,6 +55,7 @@ export const vf2CellValueSchema = z.object({
   valueNum: z.number().nullable().optional(),
   valueText: z.string().max(10000).nullable().optional(),
   valueJson: z.unknown().optional(),
+  validation: vf2CellValidationInputSchema,
 })
 
 export const vf2GuardarCeldasSchema = z.object({

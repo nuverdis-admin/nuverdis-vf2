@@ -48,6 +48,14 @@ interface ItemInfo {
   etiqueta: string  // ej. "GRI 305-1 / Emisiones directas" o "NCG 2.1 / Misión y visión"
 }
 
+interface MetricaMin {
+  metric_id: number
+  public_id: string
+  codigo: string
+  nombre: string
+  unidad: string | null
+}
+
 interface Props {
   tarea: Vf2Tarea
   coleccion: Vf2Coleccion | null
@@ -62,6 +70,7 @@ interface Props {
   usuarios: UsuarioItem[]
   equipos: EquipoItem[]
   metrica: Vf2Metric | null
+  metricas: MetricaMin[]
   evidencias: Vf2Evidencia[]
   actorEmpresaId: number
   itemInfo?: ItemInfo | null
@@ -81,6 +90,7 @@ export default function Vf2TareaView({
   usuarios,
   equipos,
   metrica: metricaInit,
+  metricas,
   evidencias: evidenciasInit,
   actorEmpresaId,
   itemInfo,
@@ -222,6 +232,7 @@ export default function Vf2TareaView({
             celdas={celdas}
             puedeEditar={puedeEditar}
             tareaPublicId={tarea.public_id}
+            metricas={metricas}
           />
         ) : (
           <div className="flex items-center justify-center h-full">

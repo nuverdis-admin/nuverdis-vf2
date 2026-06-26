@@ -4,6 +4,8 @@
 // Invariante: el valor canónico NUNCA se determina aquí; solo al aprobar via RPC.
 // Co-edición: Hocuspocus en wss://collab.nuverdis.com via token efímero (60s TTL).
 // Degradación: si el WS no conecta, autosave directo a vf2_cell vía server action.
+// A1: cada celda lleva su coordenada (metric_id, periodo_inicio/fin) en `validation`
+//     derivada de la config de fila/columna → el RPC materializa 1 Fact por coordenada.
 
 import { useState, useCallback, useRef, useEffect } from 'react'
 import DataEditor, {
@@ -16,57 +18,90 @@ import DataEditor, {
 import '@glideapps/glide-data-grid/dist/index.css'
 import * as Y from 'yjs'
 import { HocuspocusProvider } from '@hocuspocus/provider'
+import { Settings2, ChevronDown, ChevronUp } from 'lucide-react'
 import { vf2GuardarCeldas } from '@/app/actions/vf2-tareas'
 import { vf2EmitirTokenColab } from '@/app/actions/vf2-colab'
 import type { Vf2Sheet, Vf2Cell } from '@/lib/vf2/types'
 import { rowKey, colKey } from '@/lib/vf2/fact-coord'
+
+interface MetricaMin {
+  metric_id: number
+  public_id: string
+  codigo: string
+  nombre: string
+  unidad: string | null
+}
 
 interface Props {
   sheet: Vf2Sheet
   celdas: Vf2Cell[]
   puedeEditar: boolean
   tareaPublicId: string
+  metricas: MetricaMin[]
 }
 
 type ColabStatus = 'connecting' | 'connected' | 'degraded' | 'readonly'
+
+interface RowConfig { metricId: number | null }
+interface ColConfig { year: number | null }
+
+interface DirtyCellPayload {
+  rowKey: string
+  colKey: string
+  valueNum: number | null
+  valueText: string | null
+}
 
 const AUTOSAVE_DELAY_MS = 1200
 const DEFAULT_ROWS = 10
 const DEFAULT_COLS = 5
 const COLAB_URL = process.env.NEXT_PUBLIC_VF2_COLLAB_URL ?? 'wss://collab.nuverdis.com'
 
-// Convierte celdas BD a Map keyed por "rN:cN"
 function buildMatrix(celdas: Vf2Cell[]): Map<string, Vf2Cell> {
   const map = new Map<string, Vf2Cell>()
   for (const c of celdas) map.set(`${c.row_key}:${c.col_key}`, c)
   return map
 }
 
-// Valor de celda para mostrar (num tiene precedencia sobre text)
 function cellDisplayValue(cell: Vf2Cell | undefined): string {
   if (!cell) return ''
   if (cell.value_num !== null && cell.value_num !== undefined) return String(cell.value_num)
   return cell.value_text ?? ''
 }
 
-export default function Vf2GridEditor({ sheet, celdas, puedeEditar }: Props) {
+function makeDefaultRowConfigs(n: number): RowConfig[] {
+  return Array.from({ length: n }, () => ({ metricId: null }))
+}
+
+function makeDefaultColConfigs(n: number): ColConfig[] {
+  const currentYear = new Date().getFullYear()
+  return Array.from({ length: n }, (_, i) => ({ year: currentYear - (n - 1 - i) }))
+}
+
+export default function Vf2GridEditor({ sheet, celdas, puedeEditar, metricas }: Props) {
   const [rows] = useState(DEFAULT_ROWS)
   const [cols] = useState(DEFAULT_COLS)
 
-  // Estado local del grid (fuente de verdad para el render)
   const [matrix, setMatrix] = useState<Map<string, Vf2Cell>>(() => buildMatrix(celdas))
-
-  // Estado de co-edición
   const [colabStatus, setColabStatus] = useState<ColabStatus>(puedeEditar ? 'connecting' : 'readonly')
   const [presenceCount, setPresenceCount] = useState(0)
-
-  // Autosave local (fallback si WS no disponible o para flush final)
   const [isSaving, setIsSaving] = useState(false)
   const [isDirty, setIsDirty] = useState(false)
-  const dirtyRef = useRef<Map<string, { rowKey: string; colKey: string; valueNum: number | null; valueText: string | null }>>(new Map())
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [showConfig, setShowConfig] = useState(false)
 
-  // Refs Yjs
+  // Configuración de coordenadas por fila y columna (A1)
+  const [rowConfigs, setRowConfigs] = useState<RowConfig[]>(() => makeDefaultRowConfigs(DEFAULT_ROWS))
+  const [colConfigs, setColConfigs] = useState<ColConfig[]>(() => makeDefaultColConfigs(DEFAULT_COLS))
+
+  const dirtyRef = useRef<Map<string, DirtyCellPayload>>(new Map())
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const rowConfigsRef = useRef(rowConfigs)
+  const colConfigsRef = useRef(colConfigs)
+
+  // Mantener refs en sync con state (para el closure de flushAutosave)
+  useEffect(() => { rowConfigsRef.current = rowConfigs }, [rowConfigs])
+  useEffect(() => { colConfigsRef.current = colConfigs }, [colConfigs])
+
   const ydocRef = useRef<Y.Doc | null>(null)
   const providerRef = useRef<HocuspocusProvider | null>(null)
   const ycellsRef = useRef<Y.Map<string> | null>(null)
@@ -82,7 +117,6 @@ export default function Vf2GridEditor({ sheet, celdas, puedeEditar }: Props) {
     let destroyed = false
 
     async function initColab() {
-      // 1. Emitir token efímero desde el servidor
       const tokenResult = await vf2EmitirTokenColab({ sheetPublicId: sheet.public_id })
       if (!tokenResult.ok || destroyed) {
         setColabStatus('degraded')
@@ -90,15 +124,12 @@ export default function Vf2GridEditor({ sheet, celdas, puedeEditar }: Props) {
       }
 
       const { token, docName } = tokenResult
-
-      // 2. Crear el Y.Doc y conectar Hocuspocus
       const ydoc = new Y.Doc()
       ydocRef.current = ydoc
 
       const ycells = ydoc.getMap<string>('cells')
       ycellsRef.current = ycells
 
-      // Precarga estado local en el Y.Map (seed inicial)
       ydoc.transact(() => {
         matrix.forEach((cell, key) => {
           const v = cellDisplayValue(cell)
@@ -106,7 +137,6 @@ export default function Vf2GridEditor({ sheet, celdas, puedeEditar }: Props) {
         })
       })
 
-      // 3. Observar cambios remotos y actualizar el grid
       ycells.observe(() => {
         if (destroyed) return
         setMatrix(prev => {
@@ -147,15 +177,9 @@ export default function Vf2GridEditor({ sheet, celdas, puedeEditar }: Props) {
         name: docName,
         document: ydoc,
         token,
-        onConnect() {
-          if (!destroyed) setColabStatus('connected')
-        },
-        onDisconnect() {
-          if (!destroyed) setColabStatus('degraded')
-        },
-        onAwarenessUpdate({ states }) {
-          if (!destroyed) setPresenceCount(states.length)
-        },
+        onConnect() { if (!destroyed) setColabStatus('connected') },
+        onDisconnect() { if (!destroyed) setColabStatus('degraded') },
+        onAwarenessUpdate({ states }) { if (!destroyed) setPresenceCount(states.length) },
       })
 
       providerRef.current = provider
@@ -177,7 +201,7 @@ export default function Vf2GridEditor({ sheet, celdas, puedeEditar }: Props) {
 
   // ── Columnas del grid ─────────────────────────────────────────────────────
   const columns: GridColumn[] = Array.from({ length: cols }, (_, i) => ({
-    title: `Col ${i + 1}`,
+    title: colConfigs[i]?.year ? String(colConfigs[i].year) : `Col ${i + 1}`,
     id: colKey(i),
     width: 160,
   }))
@@ -220,13 +244,43 @@ export default function Vf2GridEditor({ sheet, celdas, puedeEditar }: Props) {
     [matrix, puedeEditar, colabStatus]
   )
 
-  // ── Edición ───────────────────────────────────────────────────────────────
+  // ── Autosave con coordenada por celda (A1) ────────────────────────────────
   const flushAutosave = useCallback(async () => {
-    const cells = Array.from(dirtyRef.current.values())
-    if (cells.length === 0) return
+    const dirtyCells = Array.from(dirtyRef.current.values())
+    if (dirtyCells.length === 0) return
     dirtyRef.current.clear()
     setIsDirty(false)
     setIsSaving(true)
+
+    const cells = dirtyCells.map(c => {
+      const rowIdx = parseInt(c.rowKey.replace('r', ''), 10)
+      const colIdx = parseInt(c.colKey.replace('c', ''), 10)
+      const rCfg = rowConfigsRef.current[rowIdx]
+      const cCfg = colConfigsRef.current[colIdx]
+      const year = cCfg?.year
+
+      const validation =
+        rCfg?.metricId || year
+          ? {
+              ...(rCfg?.metricId ? { metric_id: rCfg.metricId } : {}),
+              ...(year
+                ? {
+                    periodo_inicio: `${year}-01-01`,
+                    periodo_fin: `${year}-12-31`,
+                  }
+                : {}),
+            }
+          : undefined
+
+      return {
+        rowKey: c.rowKey,
+        colKey: c.colKey,
+        valueNum: c.valueNum,
+        valueText: c.valueText,
+        ...(validation ? { validation } : {}),
+      }
+    })
+
     await vf2GuardarCeldas({ sheetPublicId: sheet.public_id, cells })
     setIsSaving(false)
   }, [sheet.public_id])
@@ -241,7 +295,6 @@ export default function Vf2GridEditor({ sheet, celdas, puedeEditar }: Props) {
       const textValue = numValue === null ? rawValue : null
       const key = `${rk}:${ck}`
 
-      // Actualizar estado local
       setMatrix(prev => {
         const next = new Map(prev)
         const existing = next.get(key)
@@ -269,14 +322,12 @@ export default function Vf2GridEditor({ sheet, celdas, puedeEditar }: Props) {
         return next
       })
 
-      // Propagar a Yjs (co-edición en vivo)
       if (ycellsRef.current && colabStatus === 'connected') {
         ydocRef.current?.transact(() => {
           ycellsRef.current!.set(key, rawValue)
         })
       }
 
-      // Acumular para autosave (fallback o flush final)
       dirtyRef.current.set(key, { rowKey: rk, colKey: ck, valueNum: numValue, valueText: textValue })
       setIsDirty(true)
 
@@ -300,6 +351,9 @@ export default function Vf2GridEditor({ sheet, celdas, puedeEditar }: Props) {
     readonly: 'text-gray-4',
   }
 
+  // ── Panel de coordenadas (A1) ─────────────────────────────────────────────
+  const coordConfigured = rowConfigs.some(r => r.metricId) || colConfigs.some(c => c.year)
+
   return (
     <div className="flex flex-col h-full">
       {/* Barra de estado */}
@@ -309,11 +363,102 @@ export default function Vf2GridEditor({ sheet, celdas, puedeEditar }: Props) {
           <span className={`text-xs font-medium ${statusColor[colabStatus]}`}>
             {statusLabel[colabStatus]}
           </span>
+          {coordConfigured && (
+            <span className="text-xs text-primary-6 font-medium">Coordenadas configuradas</span>
+          )}
         </div>
-        <span className="text-xs text-gray-4">
-          {isSaving ? 'Guardando…' : isDirty ? 'Cambios sin guardar' : 'Guardado'}
-        </span>
+        <div className="flex items-center gap-3">
+          {puedeEditar && (
+            <button
+              type="button"
+              onClick={() => setShowConfig(v => !v)}
+              className="flex items-center gap-1 text-xs text-gray-5 hover:text-gray-8 rounded-lg px-2 py-1 hover:bg-gray-2 transition-colors"
+            >
+              <Settings2 className="h-3 w-3" />
+              Coordenadas
+              {showConfig ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+            </button>
+          )}
+          <span className="text-xs text-gray-4">
+            {isSaving ? 'Guardando…' : isDirty ? 'Cambios sin guardar' : 'Guardado'}
+          </span>
+        </div>
       </div>
+
+      {/* Panel de configuración de coordenadas */}
+      {showConfig && puedeEditar && (
+        <div className="border-b border-gray-3 bg-gray-1/60 px-4 py-3 space-y-3">
+          {/* Periodos por columna */}
+          <div>
+            <p className="text-xs font-medium text-gray-6 mb-1.5">
+              Periodos por columna (año)
+            </p>
+            <div className="flex gap-2 flex-wrap">
+              {colConfigs.map((cfg, i) => (
+                <div key={i} className="flex items-center gap-1">
+                  <span className="text-xs text-gray-4 w-10">Col {i + 1}</span>
+                  <input
+                    type="number"
+                    min={2000}
+                    max={2100}
+                    value={cfg.year ?? ''}
+                    onChange={e => {
+                      const year = e.target.value ? parseInt(e.target.value, 10) : null
+                      setColConfigs(prev => {
+                        const next = [...prev]
+                        next[i] = { year }
+                        return next
+                      })
+                    }}
+                    placeholder="Año"
+                    className="w-20 text-xs border border-gray-3 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-4"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Métricas por fila */}
+          <div>
+            <p className="text-xs font-medium text-gray-6 mb-1.5">
+              Métricas por fila
+            </p>
+            {metricas.length === 0 ? (
+              <p className="text-xs text-gray-4 italic">
+                No hay métricas creadas. Crea métricas desde el panel de métricas.
+              </p>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                {rowConfigs.map((cfg, i) => (
+                  <div key={i} className="flex items-center gap-1">
+                    <span className="text-xs text-gray-4 w-10 shrink-0">Fila {i + 1}</span>
+                    <select
+                      value={cfg.metricId ?? ''}
+                      onChange={e => {
+                        const metricId = e.target.value ? parseInt(e.target.value, 10) : null
+                        setRowConfigs(prev => {
+                          const next = [...prev]
+                          next[i] = { metricId }
+                          return next
+                        })
+                      }}
+                      className="flex-1 text-xs border border-gray-3 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-4 bg-white truncate"
+                    >
+                      <option value="">— sin métrica —</option>
+                      {metricas.map(m => (
+                        <option key={m.metric_id} value={m.metric_id}>
+                          {m.codigo} — {m.nombre}
+                          {m.unidad ? ` (${m.unidad})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Grid */}
       <div className="flex-1">

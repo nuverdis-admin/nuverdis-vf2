@@ -49,12 +49,13 @@ export default async function TareaPage({
     ? supabase.from('ncg_items_reporte').select('jerarquia_1, jerarquia_1_nombre, jerarquia_2_nombre').eq('id', tarea.ncg_item_id).single()
     : Promise.resolve({ data: null })
 
-  const [rolesRes, sheetsRes, usuariosRes, equiposRes, metricaRes, griItemRes, ncgItemRes] = await Promise.all([
+  const [rolesRes, sheetsRes, usuariosRes, equiposRes, metricaRes, metricasRes, griItemRes, ncgItemRes] = await Promise.all([
     supabase.from('vf2_tarea_rol').select('*').eq('tarea_id', tarea.tarea_id).eq('activo', true),
     supabase.from('vf2_sheet').select('*').eq('tarea_id', tarea.tarea_id).eq('empresa_id', actor.empresaId).order('orden', { ascending: true }),
     supabase.from('usuarios').select('uid, nombre_completo').eq('empresa_id', actor.empresaId).eq('activo', true),
     supabase.from('equipos').select('equipo_id, nombre').eq('empresa_id', actor.empresaId),
     metricaQuery,
+    supabase.from('vf2_metric').select('metric_id, public_id, codigo, nombre, unidad').eq('empresa_id', actor.empresaId).eq('activo', true).order('codigo'),
     griItemQuery,
     ncgItemQuery,
   ])
@@ -84,6 +85,7 @@ export default async function TareaPage({
 
   const equipos = (equiposRes.data ?? []) as { equipo_id: number; nombre: string }[]
   const metrica = ((metricaRes as { data: unknown[] }).data?.[0] ?? null) as Vf2Metric | null
+  const metricas = (metricasRes.data ?? []) as Pick<Vf2Metric, 'metric_id' | 'public_id' | 'codigo' | 'nombre' | 'unidad'>[]
 
   // Construir itemInfo para el header
   let itemInfo: { estandar: string; etiqueta: string } | null = null
@@ -137,6 +139,7 @@ export default async function TareaPage({
       usuarios={usuarios}
       equipos={equipos}
       metrica={metrica}
+      metricas={metricas}
       evidencias={evidencias}
       actorEmpresaId={actor.empresaId}
       itemInfo={itemInfo}
