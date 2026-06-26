@@ -1,5 +1,5 @@
 'use client'
-// app/(dashboard)/vf2/components/Vf2TareaView.tsx — Orquestador cliente de la tarea vf2_
+// app/(dashboard)/dashboard/vf2/components/Vf2TareaView.tsx — Orquestador cliente de la tarea vf2_
 
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
@@ -16,6 +16,10 @@ import {
 import { vf2CambiarEstado, vf2Aprobar } from '@/app/actions/vf2-tareas'
 import Vf2GridEditor from './Vf2GridEditor'
 import Vf2AccionesBar from './Vf2AccionesBar'
+import Vf2RolesPanel from './Vf2RolesPanel'
+import Vf2MetricaBadge from './Vf2MetricaBadge'
+import Vf2EvidenciasPanel from './Vf2EvidenciasPanel'
+import Vf2LinkedDataPanel from './Vf2LinkedDataPanel'
 import type {
   Vf2Tarea,
   Vf2TareaRolRow,
@@ -24,7 +28,20 @@ import type {
   Vf2Coleccion,
   Vf2TareaEstado,
   Vf2TareaRol,
+  Vf2Metric,
+  Vf2Evidencia,
 } from '@/lib/vf2/types'
+
+interface UsuarioItem {
+  uid: string
+  nombre_completo: string
+  rol: string
+}
+
+interface EquipoItem {
+  equipo_id: number
+  nombre: string
+}
 
 interface Props {
   tarea: Vf2Tarea
@@ -37,24 +54,38 @@ interface Props {
   actorRolTarea: Vf2TareaRol | null
   proyectoRef: string
   colRef: string
+  usuarios: UsuarioItem[]
+  equipos: EquipoItem[]
+  metrica: Vf2Metric | null
+  evidencias: Vf2Evidencia[]
+  actorEmpresaId: number
 }
 
 export default function Vf2TareaView({
   tarea: tareaInit,
   coleccion,
-  roles,
+  roles: rolesInit,
   sheets,
   celdas,
+  actorUid,
   actorRolApp,
   actorRolTarea,
   proyectoRef,
   colRef,
+  usuarios,
+  equipos,
+  metrica: metricaInit,
+  evidencias: evidenciasInit,
+  actorEmpresaId,
 }: Props) {
   const [tarea, setTarea] = useState(tareaInit)
+  const [roles, setRoles] = useState<Vf2TareaRolRow[]>(rolesInit)
+  const [metrica, setMetrica] = useState<Vf2Metric | null>(metricaInit)
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
 
   const rolApp = actorRolApp as 'administrador' | 'encargado' | 'revisor' | 'superadmin'
+  const esAdmin = rolApp === 'administrador' || rolApp === 'superadmin'
 
   const puedeEditar = vf2CanEditarCeldas(rolApp, actorRolTarea, tarea.estado)
   const puedeEnviarRevision = vf2CanEnviarRevision(rolApp, actorRolTarea, tarea.estado)
@@ -126,7 +157,6 @@ export default function Vf2TareaView({
             </span>
           </div>
 
-          {/* Barra de acciones */}
           <Vf2AccionesBar
             estado={tarea.estado}
             isPending={isPending}
@@ -144,6 +174,18 @@ export default function Vf2TareaView({
         {tarea.instruccion && (
           <p className="text-sm text-gray-5 mt-2">{tarea.instruccion}</p>
         )}
+
+        {/* Métrica vinculada (necesaria para materializar Facts al aprobar) */}
+        <div className="mt-2">
+          <Vf2MetricaBadge
+            metrica={metrica}
+            griItemId={tarea.gri_item_id ?? null}
+            ncgItemId={tarea.ncg_item_id ?? null}
+            tareaPublicId={tarea.public_id}
+            esAdmin={esAdmin}
+            onMetricaCreada={setMetrica}
+          />
+        </div>
 
         {error && (
           <p className="text-xs text-critique-7 mt-2 bg-critique-1 px-3 py-1.5 rounded-lg">
@@ -170,17 +212,37 @@ export default function Vf2TareaView({
         )}
       </div>
 
-      {/* Roles sidebar info */}
-      {roles.length > 0 && (
-        <div className="px-4 md:px-8 py-3 border-t border-gray-3 bg-gray-1 flex items-center gap-4 text-xs text-gray-5">
-          {roles.map(r => (
-            <span key={r.tarea_rol_id} className="capitalize">
-              <span className="font-medium text-gray-7">{r.rol}:</span>{' '}
-              {r.asignado_user_id ? `uid:${r.asignado_user_id.slice(0, 8)}…` : `equipo:${r.asignado_equipo_id}`}
-            </span>
-          ))}
-        </div>
+      {/* Panel de evidencias */}
+      <Vf2EvidenciasPanel
+        tareaPublicId={tarea.public_id}
+        empresaId={actorEmpresaId}
+        evidenciasInit={evidenciasInit}
+        puedeSubir={puedeEditar}
+        actorUid={actorUid}
+        esAdmin={esAdmin}
+        tareaAprobada={tarea.estado === 'aprobada'}
+      />
+
+      {/* Panel Linked Data (solo si hay métrica) */}
+      {metrica && (
+        <Vf2LinkedDataPanel
+          metricPublicId={metrica.public_id}
+          metricCodigo={metrica.codigo}
+          metricNombre={metrica.nombre}
+          metricUnidad={metrica.unidad}
+        />
       )}
+
+      {/* Panel de roles */}
+      <Vf2RolesPanel
+        tareaPublicId={tarea.public_id}
+        roles={roles}
+        usuarios={usuarios}
+        equipos={equipos}
+        esAdmin={esAdmin}
+        tareaAprobada={tarea.estado === 'aprobada'}
+        onRolesUpdated={setRoles}
+      />
     </div>
   )
 }

@@ -645,6 +645,7 @@ BEGIN
     p_accion      := 'VF2_APROBAR_TAREA',
     p_tabla       := 'vf2_tarea',
     p_registro_id := v_tarea.public_id,
+    p_datos_prev  := NULL,
     p_datos_new   := jsonb_build_object(
       'estado', 'aprobada',
       'cells_materialized', v_cells_count,
@@ -787,6 +788,7 @@ BEGIN
     p_accion      := 'VF2_CREAR_COLECCION',
     p_tabla       := 'vf2_coleccion',
     p_registro_id := v_coleccion.public_id,
+    p_datos_prev  := NULL,
     p_datos_new   := jsonb_build_object('estandar', p_estandar, 'nombre', p_nombre),
     p_proyecto_id := p_proyecto_id
   );

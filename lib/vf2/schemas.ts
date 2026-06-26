@@ -81,6 +81,16 @@ export const vf2CrearBindingSchema = z.object({
   pinnedRevisionId: z.string().uuid().optional(),
 })
 
+// Crear métrica
+export const vf2CrearMetricaSchema = z.object({
+  codigo: z.string().min(1).max(100),
+  nombre: z.string().min(1).max(300),
+  valueKind: vf2ValueKindSchema,
+  unidad: z.string().max(50).optional(),
+  griItemId: z.number().int().positive().optional(),
+  ncgItemId: z.number().int().positive().optional(),
+})
+
 // Agregar comentario
 export const vf2AgregarComentarioSchema = z.object({
   tareaPublicId: vf2PublicId,

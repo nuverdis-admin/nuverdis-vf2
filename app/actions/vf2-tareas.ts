@@ -13,6 +13,7 @@ import {
   vf2CambiarEstadoSchema,
   vf2AprobarSchema,
   vf2AgregarComentarioSchema,
+  vf2CrearMetricaSchema,
 } from '@/lib/vf2/schemas'
 import type {
   Vf2CrearColeccionResult,
@@ -333,6 +334,44 @@ export async function vf2AgregarComentario(
 
     revalidatePath('/dashboard/vf2', 'layout')
     return { ok: true }
+  } catch {
+    return { ok: false, error: 'Error al procesar la solicitud' }
+  }
+}
+
+// ─── Crear métrica ───────────────────────────────────────────────────────────
+
+export async function vf2CrearMetrica(
+  input: unknown
+): Promise<{ ok: true; metricPublicId: string } | { ok: false; error: string }> {
+  const parsed = vf2CrearMetricaSchema.safeParse(input)
+  if (!parsed.success) return { ok: false, error: 'Datos inválidos' }
+
+  try {
+    const actor = await requireAdmin()
+    const supabase = await createClient()
+
+    const { data, error } = await supabase
+      .from('vf2_metric')
+      .insert({
+        empresa_id: actor.empresaId,
+        codigo: parsed.data.codigo,
+        nombre: parsed.data.nombre,
+        value_kind: parsed.data.valueKind,
+        unidad: parsed.data.unidad ?? null,
+        gri_item_id: parsed.data.griItemId ?? null,
+        ncg_item_id: parsed.data.ncgItemId ?? null,
+      })
+      .select('public_id')
+      .single()
+
+    if (error) {
+      console.error('[vf2-tareas] vf2CrearMetrica:', error.message)
+      return { ok: false, error: 'Error al crear métrica' }
+    }
+
+    revalidatePath('/dashboard/vf2', 'layout')
+    return { ok: true, metricPublicId: data.public_id }
   } catch {
     return { ok: false, error: 'Error al procesar la solicitud' }
   }
