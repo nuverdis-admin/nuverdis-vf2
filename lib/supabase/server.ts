@@ -22,6 +22,14 @@ export async function createClient() {
           }
         },
       },
+      // Datos multi-tenant SIEMPRE frescos: opt-out del Next.js Data Cache.
+      // Sin esto, los .select() (HTTP GET) se cachean por defecto y devuelven
+      // datos obsoletos, mientras los .rpc() (POST) sí refrescan — provocando
+      // desincronización entre vistas (ej. overview vs sidenav de colecciones).
+      global: {
+        fetch: (input: RequestInfo | URL, init?: RequestInit) =>
+          fetch(input, { ...init, cache: "no-store" }),
+      },
     }
   );
 }
