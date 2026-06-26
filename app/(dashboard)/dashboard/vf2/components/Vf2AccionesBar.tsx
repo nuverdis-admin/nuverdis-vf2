@@ -101,7 +101,7 @@ export default function Vf2AccionesBar({
           <button
             onClick={() => setModalAprobar(true)}
             disabled={isPending}
-            className="bg-success-5 hover:bg-success-6 text-white text-sm px-4 py-1.5 rounded-lg font-medium flex items-center gap-1.5 transition-colors"
+            className="bg-primary-5 hover:bg-primary-6 text-white text-sm px-4 py-1.5 rounded-lg font-medium flex items-center gap-1.5 transition-colors"
           >
             <CheckCircle className="h-3.5 w-3.5" />
             Aprobar
@@ -172,7 +172,7 @@ export default function Vf2AccionesBar({
                   setNotasAprobacion('')
                 }}
                 disabled={isPending}
-                className="bg-success-5 hover:bg-success-6 text-white text-sm px-4 py-1.5 rounded-lg font-medium disabled:opacity-50 transition-colors flex items-center gap-1.5"
+                className="bg-primary-5 hover:bg-primary-6 text-white text-sm px-4 py-1.5 rounded-lg font-medium disabled:opacity-50 transition-colors flex items-center gap-1.5"
               >
                 <CheckCircle className="h-3.5 w-3.5" />
                 Confirmar aprobación

@@ -362,9 +362,20 @@ export async function vf2AgregarComentario(
 
 // ─── Crear métrica ───────────────────────────────────────────────────────────
 
+interface Vf2MetricaCatalogo {
+  metric_id: number
+  public_id: string
+  codigo: string
+  nombre: string
+  unidad: string | null
+}
+
 export async function vf2CrearMetrica(
   input: unknown
-): Promise<{ ok: true; metricPublicId: string } | { ok: false; error: string }> {
+): Promise<
+  | { ok: true; metricPublicId: string; metrica: Vf2MetricaCatalogo }
+  | { ok: false; error: string }
+> {
   const parsed = vf2CrearMetricaSchema.safeParse(input)
   if (!parsed.success) return { ok: false, error: 'Datos inválidos' }
 
@@ -383,7 +394,7 @@ export async function vf2CrearMetrica(
         gri_item_id: parsed.data.griItemId ?? null,
         ncg_item_id: parsed.data.ncgItemId ?? null,
       })
-      .select('public_id')
+      .select('metric_id, public_id, codigo, nombre, unidad')
       .single()
 
     if (error) {
@@ -392,7 +403,17 @@ export async function vf2CrearMetrica(
     }
 
     revalidatePath('/dashboard/proyecto', 'layout')
-    return { ok: true, metricPublicId: data.public_id }
+    return {
+      ok: true,
+      metricPublicId: data.public_id,
+      metrica: {
+        metric_id: data.metric_id,
+        public_id: data.public_id,
+        codigo: data.codigo,
+        nombre: data.nombre,
+        unidad: data.unidad,
+      },
+    }
   } catch {
     return { ok: false, error: 'Error al procesar la solicitud' }
   }

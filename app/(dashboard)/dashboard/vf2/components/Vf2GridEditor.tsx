@@ -7,7 +7,7 @@
 // A1: cada celda lleva su coordenada (metric_id, periodo_inicio/fin) en `validation`
 //     derivada de la config de fila/columna → el RPC materializa 1 Fact por coordenada.
 
-import { useState, useCallback, useRef, useEffect } from 'react'
+import { useState, useCallback, useRef, useEffect, useTransition } from 'react'
 import DataEditor, {
   type GridCell,
   type GridColumn,
@@ -18,8 +18,8 @@ import DataEditor, {
 import '@glideapps/glide-data-grid/dist/index.css'
 import * as Y from 'yjs'
 import { HocuspocusProvider } from '@hocuspocus/provider'
-import { Settings2, ChevronDown, ChevronUp } from 'lucide-react'
-import { vf2GuardarCeldas } from '@/app/actions/vf2-tareas'
+import { Settings2, ChevronDown, ChevronUp, Plus, Check, X } from 'lucide-react'
+import { vf2GuardarCeldas, vf2CrearMetrica } from '@/app/actions/vf2-tareas'
 import { vf2EmitirTokenColab } from '@/app/actions/vf2-colab'
 import type { Vf2Sheet, Vf2Cell } from '@/lib/vf2/types'
 import { rowKey, colKey } from '@/lib/vf2/fact-coord'
@@ -38,6 +38,7 @@ interface Props {
   puedeEditar: boolean
   tareaPublicId: string
   metricas: MetricaMin[]
+  esAdmin: boolean
 }
 
 type ColabStatus = 'connecting' | 'connected' | 'degraded' | 'readonly'
@@ -78,7 +79,7 @@ function makeDefaultColConfigs(n: number): ColConfig[] {
   return Array.from({ length: n }, (_, i) => ({ year: currentYear - (n - 1 - i) }))
 }
 
-export default function Vf2GridEditor({ sheet, celdas, puedeEditar, metricas }: Props) {
+export default function Vf2GridEditor({ sheet, celdas, puedeEditar, metricas, esAdmin }: Props) {
   const [rows] = useState(DEFAULT_ROWS)
   const [cols] = useState(DEFAULT_COLS)
 
@@ -89,9 +90,49 @@ export default function Vf2GridEditor({ sheet, celdas, puedeEditar, metricas }: 
   const [isDirty, setIsDirty] = useState(false)
   const [showConfig, setShowConfig] = useState(false)
 
+  // Catálogo de métricas de la empresa — estado local para reflejar altas sin recargar.
+  const [catalogo, setCatalogo] = useState<MetricaMin[]>(metricas)
+
+  // Formulario inline "+ nueva métrica" (solo admin)
+  const [showMetricaForm, setShowMetricaForm] = useState(false)
+  const [mCodigo, setMCodigo] = useState('')
+  const [mNombre, setMNombre] = useState('')
+  const [mValueKind, setMValueKind] = useState<'num' | 'text' | 'json'>('num')
+  const [mUnidad, setMUnidad] = useState('')
+  const [mError, setMError] = useState<string | null>(null)
+  const [isCreatingMetrica, startCrearMetrica] = useTransition()
+
   // Configuración de coordenadas por fila y columna (A1)
   const [rowConfigs, setRowConfigs] = useState<RowConfig[]>(() => makeDefaultRowConfigs(DEFAULT_ROWS))
   const [colConfigs, setColConfigs] = useState<ColConfig[]>(() => makeDefaultColConfigs(DEFAULT_COLS))
+
+  function handleCrearMetrica() {
+    if (!mCodigo.trim() || !mNombre.trim()) {
+      setMError('Código y nombre son obligatorios')
+      return
+    }
+    setMError(null)
+    startCrearMetrica(async () => {
+      const res = await vf2CrearMetrica({
+        codigo: mCodigo.trim(),
+        nombre: mNombre.trim(),
+        valueKind: mValueKind,
+        unidad: mUnidad.trim() || undefined,
+      })
+      if (res.ok) {
+        setCatalogo(prev =>
+          prev.some(m => m.metric_id === res.metrica.metric_id) ? prev : [...prev, res.metrica]
+        )
+        setMCodigo('')
+        setMNombre('')
+        setMUnidad('')
+        setMValueKind('num')
+        setShowMetricaForm(false)
+      } else {
+        setMError(res.error)
+      }
+    })
+  }
 
   const dirtyRef = useRef<Map<string, DirtyCellPayload>>(new Map())
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -420,12 +461,95 @@ export default function Vf2GridEditor({ sheet, celdas, puedeEditar, metricas }: 
 
           {/* Métricas por fila */}
           <div>
-            <p className="text-xs font-medium text-gray-6 mb-1.5">
-              Métricas por fila
-            </p>
-            {metricas.length === 0 ? (
+            <div className="flex items-center justify-between mb-1.5">
+              <p className="text-xs font-medium text-gray-6">
+                Métricas por fila
+              </p>
+              {esAdmin && !showMetricaForm && (
+                <button
+                  type="button"
+                  onClick={() => { setShowMetricaForm(true); setMError(null) }}
+                  className="flex items-center gap-1 text-xs text-primary-6 hover:text-primary-7 rounded-lg px-2 py-0.5 hover:bg-primary-1 transition-colors"
+                >
+                  <Plus className="h-3 w-3" />
+                  Nueva métrica
+                </button>
+              )}
+            </div>
+
+            {/* Formulario inline de nueva métrica */}
+            {esAdmin && showMetricaForm && (
+              <div className="mb-3 bg-white border border-gray-3 rounded-xl p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-semibold text-gray-7">Nueva métrica</p>
+                  <button
+                    type="button"
+                    onClick={() => { setShowMetricaForm(false); setMError(null) }}
+                    className="text-gray-3 hover:text-gray-5"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="text"
+                    placeholder="Código (ej. GRI-305-1)"
+                    value={mCodigo}
+                    onChange={e => setMCodigo(e.target.value)}
+                    className="text-xs border border-gray-3 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary-4"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Nombre (ej. Emisiones Alcance 1)"
+                    value={mNombre}
+                    onChange={e => setMNombre(e.target.value)}
+                    className="text-xs border border-gray-3 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary-4"
+                  />
+                  <select
+                    value={mValueKind}
+                    onChange={e => setMValueKind(e.target.value as 'num' | 'text' | 'json')}
+                    className="text-xs border border-gray-3 rounded-lg px-2 py-1.5 bg-white"
+                  >
+                    <option value="num">Numérico</option>
+                    <option value="text">Texto</option>
+                    <option value="json">Tabla/JSON</option>
+                  </select>
+                  <input
+                    type="text"
+                    placeholder="Unidad (ej. tCO2e)"
+                    value={mUnidad}
+                    onChange={e => setMUnidad(e.target.value)}
+                    className="text-xs border border-gray-3 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary-4"
+                  />
+                </div>
+                {mError && <p className="text-xs text-critique-7">{mError}</p>}
+                <div className="flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => { setShowMetricaForm(false); setMError(null) }}
+                    disabled={isCreatingMetrica}
+                    className="btn btn-ghost rounded-lg text-xs"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCrearMetrica}
+                    disabled={isCreatingMetrica}
+                    className="flex items-center gap-1 bg-primary-5 hover:bg-primary-6 text-white text-xs px-3 py-1.5 rounded-lg disabled:opacity-50 transition-colors"
+                  >
+                    <Check className="h-3 w-3" />
+                    Crear
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {catalogo.length === 0 ? (
               <p className="text-xs text-gray-4 italic">
-                No hay métricas creadas. Crea métricas desde el panel de métricas.
+                {esAdmin
+                  ? 'No hay métricas creadas. Usa "Nueva métrica" para crear la primera.'
+                  : 'No hay métricas creadas. Pide a un administrador que cree métricas.'}
               </p>
             ) : (
               <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
@@ -445,7 +569,7 @@ export default function Vf2GridEditor({ sheet, celdas, puedeEditar, metricas }: 
                       className="flex-1 text-xs border border-gray-3 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-4 bg-white truncate"
                     >
                       <option value="">— sin métrica —</option>
-                      {metricas.map(m => (
+                      {catalogo.map(m => (
                         <option key={m.metric_id} value={m.metric_id}>
                           {m.codigo} — {m.nombre}
                           {m.unidad ? ` (${m.unidad})` : ''}

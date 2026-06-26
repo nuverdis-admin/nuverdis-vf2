@@ -237,6 +237,7 @@ export default function Vf2TareaView({
             puedeEditar={puedeEditar}
             tareaPublicId={tarea.public_id}
             metricas={metricas}
+            esAdmin={esAdmin}
           />
         ) : (
           <div className="flex items-center justify-center h-full">
