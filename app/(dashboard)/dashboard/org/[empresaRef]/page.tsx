@@ -146,7 +146,7 @@ export default function OrgPage({ params }: Props) {
 
     const ref = result?.ref as string | undefined;
     if (ref) {
-      router.push(`/dashboard/proyecto/${ref}/overview`);
+      router.push(`/dashboard/vf2/proyecto/${ref}`);
     }
   }
 
@@ -223,7 +223,7 @@ export default function OrgPage({ params }: Props) {
           {proyectos.map((proyecto) => (
             <div key={proyecto.proyecto_id} className="group relative">
               <Link
-                href={`/dashboard/proyecto/${proyecto.ref}/overview`}
+                href={`/dashboard/vf2/proyecto/${proyecto.ref}`}
                 className="relative flex min-h-[176px] cursor-pointer flex-col justify-between overflow-hidden rounded-lg border border-primary-3 bg-primary-1 p-5 shadow-sm transition-all hover:border-primary-4 hover:shadow-card block"
               >
                 <div className="z-10 flex items-start justify-between">

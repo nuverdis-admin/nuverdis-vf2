@@ -7,6 +7,8 @@ const SUPABASE_ORIGIN = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://jxlkwil
 const SUPABASE_WS = SUPABASE_ORIGIN.replace("https://", "wss://");
 // URL del servicio Hocuspocus en Railway (co-edición vf2_).
 const COLLAB_WS = process.env.NEXT_PUBLIC_VF2_COLLAB_URL ?? "";
+// Proyecto Supabase con los assets de marca (íconos, logos). Puede diferir del proyecto de datos.
+const ASSETS_ORIGIN = process.env.NEXT_PUBLIC_ASSETS_STORAGE_URL ?? "";
 
 // Content-Security-Policy.
 // - 'unsafe-inline' es necesario para los scripts de hidratación de Next.js y
@@ -19,7 +21,7 @@ const csp = [
     isDev ? " 'unsafe-eval'" : " 'wasm-unsafe-eval'"
   }`,
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-  `img-src 'self' data: blob: ${SUPABASE_ORIGIN}`,
+  `img-src 'self' data: blob: ${SUPABASE_ORIGIN}${ASSETS_ORIGIN ? ` ${ASSETS_ORIGIN}` : ""}`,
   "font-src 'self' data: https://fonts.gstatic.com",
   `connect-src 'self' ${SUPABASE_ORIGIN} ${SUPABASE_WS} https://cdn.jsdelivr.net https://unpkg.com${COLLAB_WS ? ` ${COLLAB_WS}` : ""}`,
   "worker-src 'self' blob:",

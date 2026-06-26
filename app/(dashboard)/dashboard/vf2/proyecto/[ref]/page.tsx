@@ -37,7 +37,7 @@ export default async function Vf2ProyectoPage({
   const lista = (colecciones ?? []) as Vf2Coleccion[]
 
   return (
-    <div className="p-4 md:p-8 max-w-4xl">
+    <div className="p-4 md:p-8">
       <div className="mb-2 flex items-center gap-2 text-sm text-gray-4">
         <Link href={`/dashboard/org`} className="hover:text-gray-7">Inicio</Link>
         <ChevronRight className="h-3 w-3" />

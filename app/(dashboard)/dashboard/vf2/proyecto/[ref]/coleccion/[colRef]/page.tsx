@@ -39,7 +39,7 @@ export default async function Vf2ColeccionPage({
   const lista = (tareas ?? []) as Vf2Tarea[]
 
   return (
-    <div className="p-4 md:p-8 max-w-4xl">
+    <div className="p-4 md:p-8">
       <div className="mb-2 flex items-center gap-2 text-sm text-gray-4">
         <Link href={`/dashboard/vf2/proyecto/${params.ref}`} className="hover:text-gray-7">
           Colecciones
