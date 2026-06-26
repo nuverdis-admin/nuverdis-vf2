@@ -1,10 +1,10 @@
-// app/(dashboard)/vf2/tarea/[publicId]/page.tsx — Detalle de tarea vf2_ con grid de celdas
+// app/(dashboard)/dashboard/vf2/tarea/[publicId]/page.tsx — Detalle de tarea vf2_ con grid de celdas
 // SERVER COMPONENT — fetches tarea + sheets + roles, renderiza <Vf2TareaView> (client)
 
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { requireSession } from '@/lib/supabase/auth-guard'
-import Vf2TareaView from '@/app/(dashboard)/vf2/components/Vf2TareaView'
+import Vf2TareaView from '@/app/(dashboard)/dashboard/vf2/components/Vf2TareaView'
 import type { Vf2Tarea, Vf2TareaRolRow, Vf2Sheet, Vf2Cell, Vf2Coleccion } from '@/lib/vf2/types'
 
 export default async function Vf2TareaPage({
