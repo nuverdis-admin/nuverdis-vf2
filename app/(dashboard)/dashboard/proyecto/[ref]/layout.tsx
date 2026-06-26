@@ -1,53 +1,64 @@
-import { notFound } from "next/navigation";
-import { redirect } from "next/navigation";
-import { ProyectoSidenav } from "@/components/reportes/ProyectoSidenav";
-import { requireSession } from "@/lib/supabase/auth-guard";
-import {
-  getCurrentEmpresa,
-  getProyectoByRef,
-  getReportesHabilitados,
-  getConteoTareasGRI,
-  getConteoTareasNCG,
-} from "@/lib/proyecto/data";
+// app/(dashboard)/dashboard/proyecto/[ref]/layout.tsx
+// SERVER — Layout del proyecto con sidenav de colecciones vf2_.
+// Reemplaza el layout legacy que usaba ProyectoSidenav + conteos GRI/NCG.
+
+import { notFound, redirect } from 'next/navigation'
+import { createClient } from '@/lib/supabase/server'
+import { requireSession } from '@/lib/supabase/auth-guard'
+import { getCurrentEmpresa, getProyectoByRef } from '@/lib/proyecto/data'
+import Vf2ProyectoSidenav from './components/Vf2ProyectoSidenav'
+
+interface Coleccion {
+  public_id: string
+  nombre: string
+  estandar: string
+  estado: string
+}
 
 export default async function ProyectoLayout({
   children,
   params,
 }: {
-  children: React.ReactNode;
-  params: { ref: string };
+  children: React.ReactNode
+  params: { ref: string }
 }) {
-  const [empresa, proyecto] = await Promise.all([
+  const [actor, empresa, proyecto] = await Promise.all([
+    requireSession(),
     getCurrentEmpresa(),
     getProyectoByRef(params.ref),
-  ]);
+  ])
 
-  if (!proyecto) notFound();
+  if (!proyecto) notFound()
 
   // Proyecto archivado: solo admins pueden acceder
-  if (proyecto.archivado_at) {
-    const actor = await requireSession();
-    if (actor.rol !== "administrador") {
-      redirect(`/dashboard/org/${empresa?.ref ?? ""}`);
-    }
+  if (proyecto.archivado_at && actor.rol !== 'administrador') {
+    redirect(`/dashboard/org/${empresa?.ref ?? ''}`)
   }
 
-  const [reportes, conteoGri, conteoNcg] = await Promise.all([
-    getReportesHabilitados(proyecto.proyecto_id),
-    getConteoTareasGRI(proyecto.proyecto_id),
-    getConteoTareasNCG(proyecto.proyecto_id),
-  ]);
+  // Cargar colecciones vf2_ del proyecto
+  const supabase = await createClient()
+  const { data: coleccionesRaw } = await supabase
+    .from('vf2_coleccion')
+    .select('public_id, nombre, estandar, estado')
+    .eq('proyecto_id', proyecto.proyecto_id)
+    .eq('empresa_id', actor.empresaId)
+    .order('created_at', { ascending: true })
+
+  const colecciones = (coleccionesRaw ?? []) as Coleccion[]
+  const esAdmin = actor.rol === 'administrador'
 
   return (
     <div className="-m-4 flex h-[calc(100vh-3.5rem)] overflow-hidden md:-m-8">
-      <ProyectoSidenav
-        empresaRef={empresa?.ref ?? ""}
-        empresaNombre={empresa?.nombre ?? "Org"}
-        proyecto={proyecto}
-        reportesHabilitados={reportes}
-        conteos={{ GRI: conteoGri, NCG: conteoNcg }}
+      <Vf2ProyectoSidenav
+        proyectoRef={params.ref}
+        proyectoNombre={proyecto.nombre_proyecto}
+        empresaRef={empresa?.ref ?? ''}
+        colecciones={colecciones}
+        esAdmin={esAdmin}
       />
-      <div className="flex-1 min-w-0 overflow-y-auto p-4 md:p-8">{children}</div>
+      <div className="flex-1 min-w-0 overflow-y-auto p-4 md:p-8">
+        {children}
+      </div>
     </div>
-  );
+  )
 }

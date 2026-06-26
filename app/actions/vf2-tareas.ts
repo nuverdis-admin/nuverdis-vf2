@@ -54,7 +54,7 @@ export async function vf2CrearColeccion(
       return { ok: false, error: 'Error al crear colección' }
     }
 
-    revalidatePath('/dashboard/vf2', 'layout')
+    revalidatePath('/dashboard/proyecto', 'layout')
     return { ok: true, data: data as Vf2CrearColeccionResult }
   } catch {
     return { ok: false, error: 'Error al procesar la solicitud' }
@@ -124,7 +124,7 @@ export async function vf2CrearTarea(
         .eq('sheet_id', sheet.sheet_id)
     }
 
-    revalidatePath('/dashboard/vf2', 'layout')
+    revalidatePath('/dashboard/proyecto', 'layout')
     return { ok: true, tareaPublicId: data.public_id }
   } catch {
     return { ok: false, error: 'Error al procesar la solicitud' }
@@ -182,7 +182,7 @@ export async function vf2AsignarRol(
       return { ok: false, error: 'Error al asignar rol' }
     }
 
-    revalidatePath('/dashboard/vf2', 'layout')
+    revalidatePath('/dashboard/proyecto', 'layout')
     return { ok: true }
   } catch {
     return { ok: false, error: 'Error al procesar la solicitud' }
@@ -261,7 +261,7 @@ export async function vf2CambiarEstado(
       return { ok: false, error: 'Error al cambiar estado' }
     }
 
-    revalidatePath('/dashboard/vf2', 'layout')
+    revalidatePath('/dashboard/proyecto', 'layout')
     return { ok: true, data: data as Vf2CambiarEstadoResult }
   } catch {
     return { ok: false, error: 'Error al procesar la solicitud' }
@@ -290,7 +290,7 @@ export async function vf2Aprobar(
       return { ok: false, error: 'Error al aprobar tarea' }
     }
 
-    revalidatePath('/dashboard/vf2', 'layout')
+    revalidatePath('/dashboard/proyecto', 'layout')
     return { ok: true, data: data as Vf2AprobarTareaResult }
   } catch {
     return { ok: false, error: 'Error al procesar la solicitud' }
@@ -332,7 +332,7 @@ export async function vf2AgregarComentario(
       return { ok: false, error: 'Error al agregar comentario' }
     }
 
-    revalidatePath('/dashboard/vf2', 'layout')
+    revalidatePath('/dashboard/proyecto', 'layout')
     return { ok: true }
   } catch {
     return { ok: false, error: 'Error al procesar la solicitud' }
@@ -370,7 +370,7 @@ export async function vf2CrearMetrica(
       return { ok: false, error: 'Error al crear métrica' }
     }
 
-    revalidatePath('/dashboard/vf2', 'layout')
+    revalidatePath('/dashboard/proyecto', 'layout')
     return { ok: true, metricPublicId: data.public_id }
   } catch {
     return { ok: false, error: 'Error al procesar la solicitud' }
@@ -424,7 +424,7 @@ export async function vf2CrearSheet(input: {
       .update({ yjs_doc_name: docName })
       .eq('sheet_id', sheet.sheet_id)
 
-    revalidatePath('/dashboard/vf2', 'layout')
+    revalidatePath('/dashboard/proyecto', 'layout')
     return { ok: true, sheetPublicId: sheet.public_id, docName }
   } catch {
     return { ok: false, error: 'Error al procesar la solicitud' }
