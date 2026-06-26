@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { ChevronRight } from 'lucide-react'
 import {
   vf2CanEditarCeldas,
+  vf2CanIniciarPreparacion,
   vf2CanEnviarRevision,
   vf2CanEnviarAprobacion,
   vf2CanAprobar,
@@ -105,6 +106,7 @@ export default function Vf2TareaView({
   const esAdmin = rolApp === 'administrador' || rolApp === 'superadmin'
 
   const puedeEditar = vf2CanEditarCeldas(rolApp, actorRolTarea, tarea.estado)
+  const puedeIniciarPreparacion = vf2CanIniciarPreparacion(rolApp, actorRolTarea, tarea.estado)
   const puedeEnviarRevision = vf2CanEnviarRevision(rolApp, actorRolTarea, tarea.estado)
   const puedeEnviarAprobacion = vf2CanEnviarAprobacion(rolApp, actorRolTarea, tarea.estado)
   const puedeAprobar = vf2CanAprobar(rolApp, actorRolTarea, tarea.estado)
@@ -177,10 +179,12 @@ export default function Vf2TareaView({
           <Vf2AccionesBar
             estado={tarea.estado}
             isPending={isPending}
+            puedeIniciarPreparacion={puedeIniciarPreparacion}
             puedeEnviarRevision={puedeEnviarRevision}
             puedeEnviarAprobacion={puedeEnviarAprobacion}
             puedeAprobar={puedeAprobar}
             puedeDevolver={puedeDevolver}
+            onIniciarPreparacion={() => handleCambiarEstado('en_preparacion')}
             onEnviarRevision={() => handleCambiarEstado('en_revision')}
             onEnviarAprobacion={() => handleCambiarEstado('en_aprobacion')}
             onAprobar={handleAprobar}

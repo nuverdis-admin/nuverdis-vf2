@@ -2,16 +2,18 @@
 // app/(dashboard)/vf2/components/Vf2AccionesBar.tsx — Barra de acciones de workflow
 
 import { useState } from 'react'
-import { CheckCircle, RotateCcw, ArrowRight, Loader2 } from 'lucide-react'
+import { CheckCircle, RotateCcw, ArrowRight, Loader2, Play } from 'lucide-react'
 import type { Vf2TareaEstado } from '@/lib/vf2/types'
 
 interface Props {
   estado: Vf2TareaEstado
   isPending: boolean
+  puedeIniciarPreparacion: boolean
   puedeEnviarRevision: boolean
   puedeEnviarAprobacion: boolean
   puedeAprobar: boolean
   puedeDevolver: boolean
+  onIniciarPreparacion: () => void
   onEnviarRevision: () => void
   onEnviarAprobacion: () => void
   onAprobar: (notas?: string) => void
@@ -20,10 +22,12 @@ interface Props {
 
 export default function Vf2AccionesBar({
   isPending,
+  puedeIniciarPreparacion,
   puedeEnviarRevision,
   puedeEnviarAprobacion,
   puedeAprobar,
   puedeDevolver,
+  onIniciarPreparacion,
   onEnviarRevision,
   onEnviarAprobacion,
   onAprobar,
@@ -34,7 +38,13 @@ export default function Vf2AccionesBar({
   const [nota, setNota] = useState('')
   const [notasAprobacion, setNotasAprobacion] = useState('')
 
-  if (!puedeEnviarRevision && !puedeEnviarAprobacion && !puedeAprobar && !puedeDevolver) {
+  if (
+    !puedeIniciarPreparacion &&
+    !puedeEnviarRevision &&
+    !puedeEnviarAprobacion &&
+    !puedeAprobar &&
+    !puedeDevolver
+  ) {
     return null
   }
 
@@ -42,6 +52,17 @@ export default function Vf2AccionesBar({
     <>
       <div className="flex items-center gap-2">
         {isPending && <Loader2 className="h-4 w-4 animate-spin text-gray-4" />}
+
+        {puedeIniciarPreparacion && (
+          <button
+            onClick={onIniciarPreparacion}
+            disabled={isPending}
+            className="btn btn-primary rounded-lg text-sm flex items-center gap-1.5"
+          >
+            <Play className="h-3.5 w-3.5" />
+            Iniciar preparación
+          </button>
+        )}
 
         {puedeDevolver && (
           <button

@@ -17,6 +17,18 @@ export function vf2CanEditarCeldas(
   return false
 }
 
+// ¿Puede iniciar la preparación? (borrador → en_preparacion)
+// Espejo del RPC: admin siempre; en su defecto, cualquier rol asignado en la tarea.
+export function vf2CanIniciarPreparacion(
+  rolApp: AppRol,
+  rolTarea: Vf2TareaRol | null,
+  estado: Vf2TareaEstado
+): boolean {
+  if (estado !== 'borrador') return false
+  if (rolApp === 'administrador' || rolApp === 'superadmin') return true
+  return rolTarea === 'preparer' || rolTarea === 'reviewer' || rolTarea === 'approver'
+}
+
 // ¿Puede enviar a revisión?
 export function vf2CanEnviarRevision(
   rolApp: AppRol,
