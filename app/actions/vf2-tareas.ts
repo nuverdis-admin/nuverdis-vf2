@@ -53,7 +53,7 @@ export async function vf2CrearColeccion(
       return { ok: false, error: 'Error al crear colección' }
     }
 
-    revalidatePath(`/dashboard/proyecto/${parsed.data.proyectoId}`)
+    revalidatePath('/dashboard/vf2', 'layout')
     return { ok: true, data: data as Vf2CrearColeccionResult }
   } catch {
     return { ok: false, error: 'Error al procesar la solicitud' }
@@ -95,7 +95,7 @@ export async function vf2CrearTarea(
         ncg_item_id: parsed.data.ncgItemId ?? null,
         ncg_requerimiento_id: parsed.data.ncgRequerimientoId ?? null,
       })
-      .select('public_id')
+      .select('public_id, tarea_id')
       .single()
 
     if (error) {
@@ -103,7 +103,27 @@ export async function vf2CrearTarea(
       return { ok: false, error: 'Error al crear tarea' }
     }
 
-    revalidatePath(`/dashboard/vf2/coleccion/${parsed.data.coleccionPublicId}`)
+    // Auto-crear hoja por defecto para que el grid esté listo al abrir la tarea
+    const { data: sheet } = await supabase
+      .from('vf2_sheet')
+      .insert({
+        empresa_id: actor.empresaId,
+        tarea_id: data.tarea_id,
+        nombre: 'Hoja 1',
+        yjs_doc_name: 'pending',
+      })
+      .select('sheet_id, public_id')
+      .single()
+
+    if (sheet) {
+      const docName = `vf2:${actor.empresaId}:${sheet.public_id}`
+      await supabase
+        .from('vf2_sheet')
+        .update({ yjs_doc_name: docName })
+        .eq('sheet_id', sheet.sheet_id)
+    }
+
+    revalidatePath('/dashboard/vf2', 'layout')
     return { ok: true, tareaPublicId: data.public_id }
   } catch {
     return { ok: false, error: 'Error al procesar la solicitud' }
@@ -161,7 +181,7 @@ export async function vf2AsignarRol(
       return { ok: false, error: 'Error al asignar rol' }
     }
 
-    revalidatePath(`/dashboard/vf2/tarea/${parsed.data.tareaPublicId}`)
+    revalidatePath('/dashboard/vf2', 'layout')
     return { ok: true }
   } catch {
     return { ok: false, error: 'Error al procesar la solicitud' }
@@ -240,7 +260,7 @@ export async function vf2CambiarEstado(
       return { ok: false, error: 'Error al cambiar estado' }
     }
 
-    revalidatePath(`/dashboard/vf2/tarea/${parsed.data.tareaPublicId}`)
+    revalidatePath('/dashboard/vf2', 'layout')
     return { ok: true, data: data as Vf2CambiarEstadoResult }
   } catch {
     return { ok: false, error: 'Error al procesar la solicitud' }
@@ -269,7 +289,7 @@ export async function vf2Aprobar(
       return { ok: false, error: 'Error al aprobar tarea' }
     }
 
-    revalidatePath(`/dashboard/vf2/tarea/${parsed.data.tareaPublicId}`)
+    revalidatePath('/dashboard/vf2', 'layout')
     return { ok: true, data: data as Vf2AprobarTareaResult }
   } catch {
     return { ok: false, error: 'Error al procesar la solicitud' }
@@ -311,7 +331,7 @@ export async function vf2AgregarComentario(
       return { ok: false, error: 'Error al agregar comentario' }
     }
 
-    revalidatePath(`/dashboard/vf2/tarea/${parsed.data.tareaPublicId}`)
+    revalidatePath('/dashboard/vf2', 'layout')
     return { ok: true }
   } catch {
     return { ok: false, error: 'Error al procesar la solicitud' }
@@ -365,7 +385,7 @@ export async function vf2CrearSheet(input: {
       .update({ yjs_doc_name: docName })
       .eq('sheet_id', sheet.sheet_id)
 
-    revalidatePath(`/dashboard/vf2/tarea/${input.tareaPublicId}`)
+    revalidatePath('/dashboard/vf2', 'layout')
     return { ok: true, sheetPublicId: sheet.public_id, docName }
   } catch {
     return { ok: false, error: 'Error al procesar la solicitud' }

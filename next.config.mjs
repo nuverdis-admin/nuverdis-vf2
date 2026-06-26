@@ -2,8 +2,11 @@
 
 // HIGH-6: headers de seguridad globales para blindar el navegador.
 const isDev = process.env.NODE_ENV !== "production";
-const SUPABASE_ORIGIN = "https://jxlkwilihblnmmhcscpd.supabase.co";
-const SUPABASE_WS = "wss://jxlkwilihblnmmhcscpd.supabase.co";
+// Derivado de la env var para que cada proyecto Vercel use su propio Supabase.
+const SUPABASE_ORIGIN = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://jxlkwilihblnmmhcscpd.supabase.co";
+const SUPABASE_WS = SUPABASE_ORIGIN.replace("https://", "wss://");
+// URL del servicio Hocuspocus en Railway (co-edición vf2_).
+const COLLAB_WS = process.env.NEXT_PUBLIC_VF2_COLLAB_URL ?? "";
 
 // Content-Security-Policy.
 // - 'unsafe-inline' es necesario para los scripts de hidratación de Next.js y
@@ -18,7 +21,7 @@ const csp = [
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   `img-src 'self' data: blob: ${SUPABASE_ORIGIN}`,
   "font-src 'self' data: https://fonts.gstatic.com",
-  `connect-src 'self' ${SUPABASE_ORIGIN} ${SUPABASE_WS} https://cdn.jsdelivr.net https://unpkg.com`,
+  `connect-src 'self' ${SUPABASE_ORIGIN} ${SUPABASE_WS} https://cdn.jsdelivr.net https://unpkg.com${COLLAB_WS ? ` ${COLLAB_WS}` : ""}`,
   "worker-src 'self' blob:",
   "frame-ancestors 'none'",
   "base-uri 'self'",

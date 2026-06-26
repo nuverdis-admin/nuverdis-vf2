@@ -1,5 +1,5 @@
-// app/(dashboard)/dashboard/vf2/tarea/[publicId]/page.tsx — Detalle de tarea vf2_ con grid de celdas
-// SERVER COMPONENT — fetches tarea + sheets + roles, renderiza <Vf2TareaView> (client)
+// app/(dashboard)/dashboard/vf2/proyecto/[ref]/coleccion/[colRef]/tarea/[tareaRef]/page.tsx
+// SERVER — detalle de tarea vf2_ con grid de celdas
 
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
@@ -10,7 +10,7 @@ import type { Vf2Tarea, Vf2TareaRolRow, Vf2Sheet, Vf2Cell, Vf2Coleccion } from '
 export default async function Vf2TareaPage({
   params,
 }: {
-  params: { publicId: string }
+  params: { ref: string; colRef: string; tareaRef: string }
 }) {
   const actor = await requireSession()
   const supabase = await createClient()
@@ -18,14 +18,13 @@ export default async function Vf2TareaPage({
   const { data: tareaRaw } = await supabase
     .from('vf2_tarea')
     .select('*')
-    .eq('public_id', params.publicId)
+    .eq('public_id', params.tareaRef)
     .eq('empresa_id', actor.empresaId)
     .single()
 
   if (!tareaRaw) notFound()
   const tarea = tareaRaw as Vf2Tarea
 
-  // Colección (para contexto)
   const { data: coleccionRaw } = await supabase
     .from('vf2_coleccion')
     .select('*')
@@ -33,7 +32,6 @@ export default async function Vf2TareaPage({
     .single()
   const coleccion = coleccionRaw as Vf2Coleccion | null
 
-  // Roles y sheets en paralelo
   const [rolesRes, sheetsRes] = await Promise.all([
     supabase
       .from('vf2_tarea_rol')
@@ -51,7 +49,6 @@ export default async function Vf2TareaPage({
   const roles = (rolesRes.data ?? []) as Vf2TareaRolRow[]
   const sheets = (sheetsRes.data ?? []) as Vf2Sheet[]
 
-  // Celdas del primer sheet (si existe)
   let celdas: Vf2Cell[] = []
   if (sheets.length > 0) {
     const { data: celdasRaw } = await supabase
@@ -62,7 +59,6 @@ export default async function Vf2TareaPage({
     celdas = (celdasRaw ?? []) as Vf2Cell[]
   }
 
-  // Detectar rol del actor en esta tarea
   const rolEnTarea = roles.find(r => r.asignado_user_id === actor.uid)?.rol ?? null
 
   return (
@@ -75,6 +71,8 @@ export default async function Vf2TareaPage({
       actorUid={actor.uid}
       actorRolApp={actor.rol}
       actorRolTarea={rolEnTarea}
+      proyectoRef={params.ref}
+      colRef={params.colRef}
     />
   )
 }

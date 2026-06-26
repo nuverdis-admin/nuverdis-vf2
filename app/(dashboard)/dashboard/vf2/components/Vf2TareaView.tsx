@@ -35,6 +35,8 @@ interface Props {
   actorUid: string
   actorRolApp: string
   actorRolTarea: Vf2TareaRol | null
+  proyectoRef: string
+  colRef: string
 }
 
 export default function Vf2TareaView({
@@ -45,6 +47,8 @@ export default function Vf2TareaView({
   celdas,
   actorRolApp,
   actorRolTarea,
+  proyectoRef,
+  colRef,
 }: Props) {
   const [tarea, setTarea] = useState(tareaInit)
   const [isPending, startTransition] = useTransition()
@@ -96,12 +100,14 @@ export default function Vf2TareaView({
       {/* Header */}
       <div className="px-4 md:px-8 py-4 border-b border-gray-3 bg-white">
         <div className="flex items-center gap-2 text-sm text-gray-4 mb-2">
-          <Link href="/dashboard/vf2" className="hover:text-gray-7">Colecciones</Link>
+          <Link href={`/dashboard/vf2/proyecto/${proyectoRef}`} className="hover:text-gray-7">
+            Colecciones
+          </Link>
           <ChevronRight className="h-3 w-3" />
           {coleccion && (
             <>
               <Link
-                href={`/dashboard/vf2/coleccion/${coleccion.public_id}`}
+                href={`/dashboard/vf2/proyecto/${proyectoRef}/coleccion/${colRef}`}
                 className="hover:text-gray-7"
               >
                 {coleccion.nombre}
