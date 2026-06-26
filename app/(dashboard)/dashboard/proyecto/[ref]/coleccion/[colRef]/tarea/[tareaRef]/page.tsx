@@ -1,4 +1,3 @@
-// app/(dashboard)/dashboard/proyecto/[ref]/coleccion/[colRef]/tarea/[tareaRef]/page.tsx
 // SERVER — detalle de tarea vf2_ con grid de celdas, roles, co-edición Yjs (ruta canónica)
 
 import { notFound } from 'next/navigation'
@@ -38,12 +37,23 @@ export default async function TareaPage({
     ? supabase.from('vf2_metric').select('*').eq('empresa_id', actor.empresaId).eq('ncg_item_id', tarea.ncg_item_id).limit(1)
     : Promise.resolve({ data: [] })
 
-  const [rolesRes, sheetsRes, usuariosRes, equiposRes, metricaRes] = await Promise.all([
+  // Resolver info del item GRI o NCG para el header
+  const griItemQuery = tarea.gri_item_id
+    ? supabase.from('gri_items_reporte').select('estandar, jerarquia_1_nombre, jerarquia_2_nombre').eq('id', tarea.gri_item_id).single()
+    : Promise.resolve({ data: null })
+
+  const ncgItemQuery = tarea.ncg_item_id
+    ? supabase.from('ncg_items_reporte').select('jerarquia_1, jerarquia_1_nombre, jerarquia_2_nombre').eq('id', tarea.ncg_item_id).single()
+    : Promise.resolve({ data: null })
+
+  const [rolesRes, sheetsRes, usuariosRes, equiposRes, metricaRes, griItemRes, ncgItemRes] = await Promise.all([
     supabase.from('vf2_tarea_rol').select('*').eq('tarea_id', tarea.tarea_id).eq('activo', true),
     supabase.from('vf2_sheet').select('*').eq('tarea_id', tarea.tarea_id).eq('empresa_id', actor.empresaId).order('orden', { ascending: true }),
     supabase.from('usuarios').select('uid, nombre_completo').eq('empresa_id', actor.empresaId).eq('activo', true),
     supabase.from('equipos').select('equipo_id, nombre').eq('empresa_id', actor.empresaId),
     metricaQuery,
+    griItemQuery,
+    ncgItemQuery,
   ])
 
   const roles = (rolesRes.data ?? []) as Vf2TareaRolRow[]
@@ -71,6 +81,26 @@ export default async function TareaPage({
 
   const equipos = (equiposRes.data ?? []) as { equipo_id: number; nombre: string }[]
   const metrica = ((metricaRes as { data: unknown[] }).data?.[0] ?? null) as Vf2Metric | null
+
+  // Construir itemInfo para el header
+  let itemInfo: { estandar: string; etiqueta: string } | null = null
+  if (griItemRes.data) {
+    const g = griItemRes.data as { estandar: string; jerarquia_1_nombre: string; jerarquia_2_nombre: string | null }
+    itemInfo = {
+      estandar: 'GRI',
+      etiqueta: g.jerarquia_2_nombre
+        ? `${g.estandar} · ${g.jerarquia_1_nombre} / ${g.jerarquia_2_nombre}`
+        : `${g.estandar} · ${g.jerarquia_1_nombre}`,
+    }
+  } else if (ncgItemRes.data) {
+    const n = ncgItemRes.data as { jerarquia_1: string; jerarquia_1_nombre: string; jerarquia_2_nombre: string | null }
+    itemInfo = {
+      estandar: 'NCG',
+      etiqueta: n.jerarquia_2_nombre
+        ? `${n.jerarquia_1} ${n.jerarquia_1_nombre} / ${n.jerarquia_2_nombre}`
+        : `${n.jerarquia_1} ${n.jerarquia_1_nombre}`,
+    }
+  }
 
   let celdas: Vf2Cell[] = []
   let evidencias: Vf2Evidencia[] = []
@@ -106,6 +136,7 @@ export default async function TareaPage({
       metrica={metrica}
       evidencias={evidencias}
       actorEmpresaId={actor.empresaId}
+      itemInfo={itemInfo}
     />
   )
 }

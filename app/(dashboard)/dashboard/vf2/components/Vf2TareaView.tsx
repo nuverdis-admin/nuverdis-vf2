@@ -43,6 +43,11 @@ interface EquipoItem {
   nombre: string
 }
 
+interface ItemInfo {
+  estandar: string
+  etiqueta: string  // ej. "GRI 305-1 / Emisiones directas" o "NCG 2.1 / Misión y visión"
+}
+
 interface Props {
   tarea: Vf2Tarea
   coleccion: Vf2Coleccion | null
@@ -59,6 +64,7 @@ interface Props {
   metrica: Vf2Metric | null
   evidencias: Vf2Evidencia[]
   actorEmpresaId: number
+  itemInfo?: ItemInfo | null
 }
 
 export default function Vf2TareaView({
@@ -77,6 +83,7 @@ export default function Vf2TareaView({
   metrica: metricaInit,
   evidencias: evidenciasInit,
   actorEmpresaId,
+  itemInfo,
 }: Props) {
   const [tarea, setTarea] = useState(tareaInit)
   const [roles, setRoles] = useState<Vf2TareaRolRow[]>(rolesInit)
@@ -170,6 +177,19 @@ export default function Vf2TareaView({
             onDevolver={(nota) => handleCambiarEstado('devuelta', nota)}
           />
         </div>
+
+        {itemInfo && (
+          <div className="flex items-center gap-2 mt-1.5">
+            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+              itemInfo.estandar === 'GRI' ? 'bg-success-1 text-success-7'
+              : itemInfo.estandar === 'NCG' ? 'bg-secondary-2 text-secondary-7'
+              : 'bg-gray-2 text-gray-6'
+            }`}>
+              {itemInfo.estandar}
+            </span>
+            <span className="text-xs text-gray-5">{itemInfo.etiqueta}</span>
+          </div>
+        )}
 
         {tarea.instruccion && (
           <p className="text-sm text-gray-5 mt-2">{tarea.instruccion}</p>

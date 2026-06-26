@@ -1,30 +1,71 @@
 'use client'
-// Vf2CrearTareaModal.tsx — Modal para crear una tarea vf2_
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Plus, X } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
 import { vf2CrearTarea } from '@/app/actions/vf2-tareas'
+
+interface GriItem {
+  id: number
+  estandar: string
+  jerarquia_1_nombre: string
+  jerarquia_2_nombre: string | null
+}
+
+interface NcgItem {
+  id: number
+  estandar_nombre: string
+  jerarquia_1: string
+  jerarquia_1_nombre: string
+  jerarquia_2_nombre: string | null
+}
 
 interface Props {
   coleccionPublicId: string
   proyectoRef: string
+  estandar: 'GRI' | 'NCG' | 'SASB'
 }
 
-export default function Vf2CrearTareaModal({ coleccionPublicId, proyectoRef }: Props) {
+export default function Vf2CrearTareaModal({ coleccionPublicId, proyectoRef, estandar }: Props) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [titulo, setTitulo] = useState('')
   const [instruccion, setInstruccion] = useState('')
   const [fechaLimite, setFechaLimite] = useState('')
+  const [griItemId, setGriItemId] = useState<number | null>(null)
+  const [ncgItemId, setNcgItemId] = useState<number | null>(null)
+  const [griItems, setGriItems] = useState<GriItem[]>([])
+  const [ncgItems, setNcgItems] = useState<NcgItem[]>([])
   const [error, setError] = useState<string | null>(null)
+
+  // Cargar items del estándar cuando se abre el modal
+  useEffect(() => {
+    if (!open) return
+    const supabase = createClient()
+    if (estandar === 'GRI') {
+      supabase
+        .from('gri_items_reporte')
+        .select('id, estandar, jerarquia_1_nombre, jerarquia_2_nombre')
+        .order('id', { ascending: true })
+        .then((res: { data: GriItem[] | null }) => setGriItems(res.data ?? []))
+    } else if (estandar === 'NCG') {
+      supabase
+        .from('ncg_items_reporte')
+        .select('id, estandar_nombre, jerarquia_1, jerarquia_1_nombre, jerarquia_2_nombre')
+        .order('id', { ascending: true })
+        .then((res: { data: NcgItem[] | null }) => setNcgItems(res.data ?? []))
+    }
+  }, [open, estandar])
 
   function handleClose() {
     setOpen(false)
     setTitulo('')
     setInstruccion('')
     setFechaLimite('')
+    setGriItemId(null)
+    setNcgItemId(null)
     setError(null)
   }
 
@@ -37,6 +78,8 @@ export default function Vf2CrearTareaModal({ coleccionPublicId, proyectoRef }: P
         titulo,
         instruccion: instruccion || undefined,
         fechaLimite: fechaLimite || undefined,
+        griItemId: griItemId ?? undefined,
+        ncgItemId: ncgItemId ?? undefined,
       })
       if (!res.ok) {
         setError(res.error)
@@ -59,7 +102,7 @@ export default function Vf2CrearTareaModal({ coleccionPublicId, proyectoRef }: P
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-modal border-t-4 border-primary-5">
+          <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-modal border-t-4 border-primary-5 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-5">
               <h2 className="text-base font-semibold text-gray-9">Nueva tarea</h2>
               <button onClick={handleClose} className="text-gray-4 hover:text-gray-7">
@@ -76,11 +119,52 @@ export default function Vf2CrearTareaModal({ coleccionPublicId, proyectoRef }: P
                   type="text"
                   value={titulo}
                   onChange={e => setTitulo(e.target.value)}
-                  placeholder="Ej. Emisiones GEI Alcance 1 (305-1)"
+                  placeholder={estandar === 'GRI' ? 'Ej. Emisiones GEI Alcance 1 (305-1)' : estandar === 'NCG' ? 'Ej. Misión y visión corporativa (2.1)' : 'Ej. Métrica de sostenibilidad'}
                   required
                   className="w-full rounded-lg border border-gray-3 px-3 py-2 text-sm text-gray-8 focus:outline-none focus:border-primary-4"
                 />
               </div>
+
+              {/* Selector de item según estándar */}
+              {estandar === 'GRI' && griItems.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-7 mb-1">
+                    Item GRI <span className="text-gray-4 font-normal">(opcional)</span>
+                  </label>
+                  <select
+                    value={griItemId ?? ''}
+                    onChange={e => setGriItemId(e.target.value ? Number(e.target.value) : null)}
+                    className="w-full rounded-lg border border-gray-3 bg-white px-3 py-2 text-sm text-gray-8 focus:outline-none focus:border-primary-4"
+                  >
+                    <option value="">Sin vincular</option>
+                    {griItems.map(item => (
+                      <option key={item.id} value={item.id}>
+                        {item.estandar} — {item.jerarquia_1_nombre}{item.jerarquia_2_nombre ? ` / ${item.jerarquia_2_nombre}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {estandar === 'NCG' && ncgItems.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-7 mb-1">
+                    Item NCG <span className="text-gray-4 font-normal">(opcional)</span>
+                  </label>
+                  <select
+                    value={ncgItemId ?? ''}
+                    onChange={e => setNcgItemId(e.target.value ? Number(e.target.value) : null)}
+                    className="w-full rounded-lg border border-gray-3 bg-white px-3 py-2 text-sm text-gray-8 focus:outline-none focus:border-primary-4"
+                  >
+                    <option value="">Sin vincular</option>
+                    {ncgItems.map(item => (
+                      <option key={item.id} value={item.id}>
+                        {item.jerarquia_1} {item.jerarquia_1_nombre}{item.jerarquia_2_nombre ? ` / ${item.jerarquia_2_nombre}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm font-medium text-gray-7 mb-1">
