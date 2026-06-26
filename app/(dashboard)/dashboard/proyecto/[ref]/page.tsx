@@ -16,6 +16,7 @@ export default async function ProyectoOverviewPage({
     requireSession(),
     getProyectoByRef(params.ref),
   ])
+  const esAdmin = actor.rol === 'administrador'
 
   if (!proyecto) notFound()
 
@@ -67,6 +68,7 @@ export default async function ProyectoOverviewPage({
           stats={stats}
           proyectoRef={params.ref}
           proyectoNombre={proyecto.nombre_proyecto}
+          esAdmin={esAdmin}
         />
       )}
     </div>

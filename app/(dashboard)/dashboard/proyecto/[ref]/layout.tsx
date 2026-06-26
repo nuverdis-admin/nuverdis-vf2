@@ -52,6 +52,7 @@ export default async function ProyectoLayout({
       <Vf2ProyectoSidenav
         proyectoRef={params.ref}
         proyectoNombre={proyecto.nombre_proyecto}
+        proyectoId={parseInt(proyecto.proyecto_id, 10)}
         empresaRef={empresa?.ref ?? ''}
         colecciones={colecciones}
         esAdmin={esAdmin}

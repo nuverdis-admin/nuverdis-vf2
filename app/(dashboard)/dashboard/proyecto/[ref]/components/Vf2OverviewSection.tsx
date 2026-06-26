@@ -32,6 +32,7 @@ interface Props {
   stats: Stats | null
   proyectoRef: string
   proyectoNombre: string
+  esAdmin?: boolean
 }
 
 interface KpiCardProps {
@@ -57,7 +58,7 @@ function KpiCard({ label, value, icon, color, href }: KpiCardProps) {
   return href ? <Link href={href}>{inner}</Link> : inner
 }
 
-export default function Vf2OverviewSection({ stats, proyectoRef }: Props) {
+export default function Vf2OverviewSection({ stats, proyectoRef, esAdmin }: Props) {
   const base = `/dashboard/proyecto/${proyectoRef}`
 
   if (!stats) {
@@ -122,6 +123,23 @@ export default function Vf2OverviewSection({ stats, proyectoRef }: Props) {
       color: 'bg-gray-1',
     },
   ]
+
+  // Estado vacío: sin colecciones aún
+  if (stats.total === 0 && stats.colecciones === 0) {
+    return (
+      <div className="rounded-xl border border-dashed border-gray-3 bg-gray-1 p-12 text-center">
+        <Layers className="h-10 w-10 text-gray-3 mx-auto mb-3" />
+        <p className="text-gray-6 font-medium mb-1">Este proyecto no tiene colecciones aún.</p>
+        {esAdmin ? (
+          <p className="text-sm text-gray-4">
+            Usa el botón <strong className="text-gray-6">+</strong> en el panel izquierdo para crear la primera colección.
+          </p>
+        ) : (
+          <p className="text-sm text-gray-4">El administrador del proyecto debe crear las colecciones.</p>
+        )}
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
