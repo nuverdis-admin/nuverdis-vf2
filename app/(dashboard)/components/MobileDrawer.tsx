@@ -11,28 +11,32 @@ import {
 } from "@/components/ui/sheet";
 import { useNavDrawer } from "./NavDrawerContext";
 import { GLOBAL_NAV } from "@/lib/nav/globalNav";
-import { TABS } from "@/components/reportes/TipoTabs";
-import { TIPOS_REPORTE } from "@/lib/reportes";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthStore } from "@/lib/store/auth";
 
 interface ParsedRoute {
   proyectoRef: string | null;
-  tipo: string | null;
+  colRef: string | null;
 }
 
 function parsePathname(pathname: string | null): ParsedRoute {
-  if (!pathname) return { proyectoRef: null, tipo: null };
-  const m = pathname.match(/^\/dashboard\/proyecto\/([^/]+)(?:\/([^/]+))?/);
-  if (!m) return { proyectoRef: null, tipo: null };
-  return { proyectoRef: m[1], tipo: m[2] ?? null };
+  if (!pathname) return { proyectoRef: null, colRef: null };
+  const m = pathname.match(/^\/dashboard\/proyecto\/([^/]+)(?:\/coleccion\/([^/]+))?/);
+  if (!m) return { proyectoRef: null, colRef: null };
+  return { proyectoRef: m[1] ?? null, colRef: m[2] ?? null };
 }
 
-function useReportesHabilitados(proyectoRef: string | null, enabled: boolean) {
-  const [tipos, setTipos] = useState<string[] | null>(null);
+interface Coleccion {
+  public_id: string;
+  nombre: string;
+  estandar: string;
+}
+
+function useColeccionesProyecto(proyectoRef: string | null, enabled: boolean) {
+  const [colecciones, setColecciones] = useState<Coleccion[] | null>(null);
   useEffect(() => {
     if (!enabled || !proyectoRef) {
-      setTipos(null);
+      setColecciones(null);
       return;
     }
     let cancelado = false;
@@ -45,21 +49,16 @@ function useReportesHabilitados(proyectoRef: string | null, enabled: boolean) {
         .maybeSingle();
       if (!proyecto || cancelado) return;
       const { data } = await supabase
-        .from("proyectos_reportes")
-        .select("reportes(tipo_reporte)")
-        .eq("proyecto_id", proyecto.proyecto_id);
+        .from("vf2_coleccion")
+        .select("public_id, nombre, estandar")
+        .eq("proyecto_id", proyecto.proyecto_id)
+        .order("created_at", { ascending: true });
       if (cancelado) return;
-      const arr =
-        (data as { reportes: { tipo_reporte: string } | null }[] | null)
-          ?.map((r) => r.reportes?.tipo_reporte)
-          .filter((t): t is string => Boolean(t)) ?? [];
-      setTipos(arr);
+      setColecciones((data ?? []) as Coleccion[]);
     })();
-    return () => {
-      cancelado = true;
-    };
+    return () => { cancelado = true; };
   }, [proyectoRef, enabled]);
-  return tipos;
+  return colecciones;
 }
 
 function NavLink({
@@ -75,9 +74,7 @@ function NavLink({
     <Link
       href={href}
       className={`flex items-center rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
-        active
-          ? "bg-primary-2 text-primary-7"
-          : "text-gray-8 hover:bg-gray-1"
+        active ? "bg-primary-2 text-primary-7" : "text-gray-8 hover:bg-gray-1"
       }`}
     >
       {children}
@@ -107,17 +104,13 @@ export function MobileDrawer({ empresaRef }: { empresaRef: string }) {
   const { isOpen, close } = useNavDrawer();
   const pathname = usePathname();
   const rol = useAuthStore((s) => s.usuarioActual?.rol ?? "");
-  const { proyectoRef, tipo } = parsePathname(pathname);
+  const { proyectoRef, colRef } = parsePathname(pathname);
 
-  const navItems = GLOBAL_NAV.filter((item) => !item.soloAdmin || rol === "administrador");
-  const tabsVisibles = TABS.filter((tab) => {
-    if (tab.soloAdmin) return rol === "administrador";
-    if (tab.rolesPermitidos) return tab.rolesPermitidos.includes(rol);
-    return true;
-  });
+  const navItems = GLOBAL_NAV.filter(
+    (item) => !item.soloAdmin || rol === "administrador"
+  );
 
-  const tipoLower = tipo?.toLowerCase() ?? null;
-  const reportesHabilitados = useReportesHabilitados(
+  const colecciones = useColeccionesProyecto(
     proyectoRef,
     isOpen && !!proyectoRef
   );
@@ -131,13 +124,12 @@ export function MobileDrawer({ empresaRef }: { empresaRef: string }) {
 
         <nav className="flex-1 overflow-y-auto px-3 pb-6">
           {/* 1) Global */}
-          <SectionLabel>General</SectionLabel>
+          <SectionLabel first>General</SectionLabel>
           <div className="flex flex-col gap-1">
             {navItems.map((item) => {
               const href = item.buildHref(empresaRef);
               const active = pathname === href;
               const Icon = item.icon;
-
               return (
                 <NavLink key={item.slug} href={href} active={active}>
                   <Icon className="mr-3 h-5 w-5 shrink-0" />
@@ -147,7 +139,7 @@ export function MobileDrawer({ empresaRef }: { empresaRef: string }) {
             })}
           </div>
 
-          {/* 2) Proyecto */}
+          {/* 2) Proyecto — overview + colecciones vf2 */}
           {proyectoRef && (
             <>
               <SectionLabel>Proyecto</SectionLabel>
@@ -158,64 +150,32 @@ export function MobileDrawer({ empresaRef }: { empresaRef: string }) {
                 >
                   Overview
                 </NavLink>
-                {TIPOS_REPORTE.map((t) => {
-                  const habilitado =
-                    reportesHabilitados === null
-                      ? false
-                      : reportesHabilitados.includes(t);
-                  const tLower = t.toLowerCase();
-                  const href = `/dashboard/proyecto/${proyectoRef}/${tLower}/seguimiento`;
-                  const active = tipoLower === tLower;
-                  if (!habilitado) {
-                    return (
-                      <span
-                        key={t}
-                        className="flex items-center justify-between rounded-lg px-3 py-2.5 text-sm text-gray-4"
-                      >
-                        {t}
-                        <span className="rounded border border-gray-2 px-1 py-0.5 text-[10px] text-gray-3">
-                          no habilitado
-                        </span>
-                      </span>
-                    );
-                  }
-                  return (
-                    <NavLink key={t} href={href} active={active}>
-                      {t}
-                    </NavLink>
-                  );
-                })}
-              </div>
-            </>
-          )}
 
-          {/* 3) Tabs del tipo activo */}
-          {proyectoRef && tipoLower && (
-            <>
-              <SectionLabel>{tipoLower.toUpperCase()} · Secciones</SectionLabel>
-              <div className="flex flex-col gap-1">
-                {tabsVisibles.map((tab) => {
-                  const href = `/dashboard/proyecto/${proyectoRef}/${tipoLower}/${tab.slug}`;
-                  const active = pathname === href;
-                  if (!tab.implementado) {
+                {colecciones === null ? (
+                  // Skeleton mientras carga
+                  <div className="space-y-1 px-3 py-1">
+                    {[1, 2].map((i) => (
+                      <div key={i} className="h-4 w-3/4 rounded bg-gray-2 animate-pulse" />
+                    ))}
+                  </div>
+                ) : colecciones.length === 0 ? (
+                  <span className="px-3 py-2 text-xs text-gray-4">
+                    Sin colecciones
+                  </span>
+                ) : (
+                  colecciones.map((col) => {
+                    const href = `/dashboard/proyecto/${proyectoRef}/coleccion/${col.public_id}`;
+                    const active = pathname.startsWith(href);
                     return (
-                      <span
-                        key={tab.slug}
-                        className="flex items-center justify-between rounded-lg px-3 py-2.5 text-sm text-gray-4"
-                      >
-                        {tab.label}
-                        <span className="rounded border border-gray-2 px-1 py-0.5 text-[10px] text-gray-3">
-                          pronto
+                      <NavLink key={col.public_id} href={href} active={active}>
+                        <span className="mr-2 text-[10px] font-bold text-gray-4 bg-gray-2 px-1 rounded">
+                          {col.estandar}
                         </span>
-                      </span>
+                        <span className="truncate">{col.nombre}</span>
+                      </NavLink>
                     );
-                  }
-                  return (
-                    <NavLink key={tab.slug} href={href} active={active}>
-                      {tab.label}
-                    </NavLink>
-                  );
-                })}
+                  })
+                )}
               </div>
             </>
           )}

@@ -4,22 +4,11 @@ import { getProyectoByRef, getCurrentEmpresa } from "@/lib/proyecto/data";
 import { createClient } from "@/lib/supabase/server";
 import { ConfiguracionView } from "./ConfiguracionView";
 
-interface OverviewStats {
-  total: number;
-  sin_asignar: number;
-  asignada: number;
-  en_revision: number;
-  completada: number;
-  retornada: number;
-  no_aplica: number;
-}
-
 export default async function ConfiguracionPage({
   params,
 }: {
   params: { ref: string };
 }) {
-  // Solo administradores acceden a esta página
   await requireAdmin();
 
   const [empresa, proyecto] = await Promise.all([
@@ -32,19 +21,24 @@ export default async function ConfiguracionPage({
   const supabase = await createClient();
   const pid = parseInt(proyecto.proyecto_id, 10);
 
-  const [{ data: statsGri }, { data: statsNcg }] = await Promise.all([
-    supabase.rpc("overview_proyecto", { p_proyecto_id: pid, p_tipo_reporte: "GRI" }),
-    supabase.rpc("overview_proyecto", { p_proyecto_id: pid, p_tipo_reporte: "NCG" }),
-  ]);
+  // Usa vf2_overview_proyecto para saber si hay tareas incompletas
+  const { data: statsRaw } = await supabase.rpc("vf2_overview_proyecto", {
+    p_proyecto_id: pid,
+  });
 
-  function incompletas(s: OverviewStats | null) {
-    if (!s) return 0;
-    return s.sin_asignar + s.asignada + s.en_revision + s.retornada;
-  }
+  const stats = statsRaw as {
+    total: number;
+    aprobada: number;
+    borrador: number;
+    en_preparacion: number;
+    en_revision: number;
+    en_aprobacion: number;
+    devuelta: number;
+  } | null;
 
-  const tareasIncompletas =
-    incompletas((statsGri as OverviewStats) ?? null) +
-    incompletas((statsNcg as OverviewStats) ?? null);
+  const tareasIncompletas = stats
+    ? stats.borrador + stats.en_preparacion + stats.en_revision + stats.en_aprobacion + stats.devuelta
+    : 0;
 
   return (
     <ConfiguracionView
