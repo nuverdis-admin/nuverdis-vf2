@@ -473,3 +473,136 @@ export async function vf2CrearSheet(input: {
     return { ok: false, error: 'Error al procesar la solicitud' }
   }
 }
+
+// ─── Cargar plantilla de grid (GRI / NCG) ────────────────────────────────────
+// Dado el public_id de una tarea, detecta su ítem vinculado (GRI o NCG),
+// encuentra el template predefinido, crea las métricas (ON CONFLICT DO NOTHING),
+// y devuelve la lista de {rowIndex, metric} para que el cliente configure el grid.
+
+export interface Vf2TemplateMetricaResult {
+  rowIndex: number
+  metricId: number
+  publicId: string
+  codigo: string
+  nombre: string
+  unidad: string | null
+}
+
+export async function vf2CargarTemplate(
+  tareaPublicId: string
+): Promise<
+  | { ok: true; templateTitulo: string; metricas: Vf2TemplateMetricaResult[] }
+  | { ok: false; error: string }
+> {
+  if (!tareaPublicId) return { ok: false, error: 'Datos inválidos' }
+
+  try {
+    const actor = await requireAdmin()
+    const supabase = await createClient()
+
+    // Verificar tarea y obtener item vinculado (anti-IDOR)
+    const { data: tarea } = await supabase
+      .from('vf2_tarea')
+      .select('tarea_id, empresa_id, gri_item_id, ncg_item_id')
+      .eq('public_id', tareaPublicId)
+      .eq('empresa_id', actor.empresaId)
+      .single()
+
+    if (!tarea) return { ok: false, error: 'Tarea no encontrada' }
+
+    // Importar helpers de templates en servidor (no expone datos al cliente)
+    const { extractItemCode, findTemplateByGriCode, findTemplateByNcgCode } =
+      await import('@/lib/vf2/templates/index')
+
+    let template = null
+
+    // Buscar template por ítem GRI
+    if (tarea.gri_item_id) {
+      const { data: item } = await supabase
+        .from('gri_items_reporte')
+        .select('jerarquia_2_nombre')
+        .eq('id', tarea.gri_item_id)
+        .single()
+
+      if (item?.jerarquia_2_nombre) {
+        const code = extractItemCode(item.jerarquia_2_nombre)
+        if (code) template = findTemplateByGriCode(code)
+      }
+    }
+
+    // Buscar template por ítem NCG
+    if (!template && tarea.ncg_item_id) {
+      const { data: item } = await supabase
+        .from('ncg_items_reporte')
+        .select('jerarquia_2_nombre')
+        .eq('id', tarea.ncg_item_id)
+        .single()
+
+      if (item?.jerarquia_2_nombre) {
+        const code = extractItemCode(item.jerarquia_2_nombre)
+        if (code) template = findTemplateByNcgCode(code)
+      }
+    }
+
+    if (!template) {
+      return { ok: false, error: 'No hay plantilla predefinida para este ítem. Usa el catálogo para asignar métricas manualmente.' }
+    }
+
+    // Crear o recuperar las métricas de la plantilla (ON CONFLICT DO NOTHING via upsert)
+    const metricas: Vf2TemplateMetricaResult[] = []
+
+    for (let i = 0; i < template.rows.length; i++) {
+      const row = template.rows[i]
+
+      // Upsert: si la métrica ya existe (mismo empresa_id + codigo), la recupera
+      const { data: existing } = await supabase
+        .from('vf2_metric')
+        .select('metric_id, public_id, codigo, nombre, unidad')
+        .eq('empresa_id', actor.empresaId)
+        .eq('codigo', row.codigo)
+        .maybeSingle()
+
+      if (existing) {
+        metricas.push({
+          rowIndex: i,
+          metricId: existing.metric_id,
+          publicId: existing.public_id,
+          codigo: existing.codigo,
+          nombre: existing.nombre,
+          unidad: existing.unidad,
+        })
+        continue
+      }
+
+      const { data: created, error } = await supabase
+        .from('vf2_metric')
+        .insert({
+          empresa_id: actor.empresaId,
+          codigo: row.codigo,
+          nombre: row.nombre,
+          value_kind: row.value_kind,
+          unidad: row.unidad ?? null,
+        })
+        .select('metric_id, public_id, codigo, nombre, unidad')
+        .single()
+
+      if (error || !created) {
+        console.error('[vf2CargarTemplate] metric insert:', row.codigo, error?.message)
+        continue
+      }
+
+      metricas.push({
+        rowIndex: i,
+        metricId: created.metric_id,
+        publicId: created.public_id,
+        codigo: created.codigo,
+        nombre: created.nombre,
+        unidad: created.unidad,
+      })
+    }
+
+    return { ok: true, templateTitulo: template.titulo, metricas }
+  } catch {
+    return { ok: false, error: 'Error al procesar la solicitud' }
+  }
+}

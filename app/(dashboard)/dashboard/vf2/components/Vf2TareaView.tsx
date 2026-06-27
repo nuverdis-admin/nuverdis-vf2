@@ -238,6 +238,7 @@ export default function Vf2TareaView({
             tareaPublicId={tarea.public_id}
             metricas={metricas}
             esAdmin={esAdmin}
+            tieneItemVinculado={!!(tarea.gri_item_id ?? tarea.ncg_item_id)}
           />
         ) : (
           <div className="flex items-center justify-center h-full">

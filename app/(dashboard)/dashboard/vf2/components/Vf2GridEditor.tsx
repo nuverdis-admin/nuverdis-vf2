@@ -18,8 +18,9 @@ import DataEditor, {
 import '@glideapps/glide-data-grid/dist/index.css'
 import * as Y from 'yjs'
 import { HocuspocusProvider } from '@hocuspocus/provider'
-import { Settings2, ChevronDown, ChevronUp, Plus, Check, X } from 'lucide-react'
-import { vf2GuardarCeldas, vf2CrearMetrica } from '@/app/actions/vf2-tareas'
+import { Settings2, ChevronDown, ChevronUp, Plus, Check, X, Wand2 } from 'lucide-react'
+import { vf2GuardarCeldas, vf2CrearMetrica, vf2CargarTemplate } from '@/app/actions/vf2-tareas'
+import type { Vf2TemplateMetricaResult } from '@/app/actions/vf2-tareas'
 import { vf2EmitirTokenColab } from '@/app/actions/vf2-colab'
 import type { Vf2Sheet, Vf2Cell } from '@/lib/vf2/types'
 import { rowKey, colKey } from '@/lib/vf2/fact-coord'
@@ -39,6 +40,7 @@ interface Props {
   tareaPublicId: string
   metricas: MetricaMin[]
   esAdmin: boolean
+  tieneItemVinculado?: boolean
 }
 
 type ColabStatus = 'connecting' | 'connected' | 'degraded' | 'readonly'
@@ -106,7 +108,7 @@ function reconstructColConfigs(celdas: Vf2Cell[], nCols: number): ColConfig[] {
   return cfgs
 }
 
-export default function Vf2GridEditor({ sheet, celdas, puedeEditar, metricas, esAdmin }: Props) {
+export default function Vf2GridEditor({ sheet, celdas, puedeEditar, metricas, esAdmin, tieneItemVinculado, tareaPublicId }: Props) {
   const [rows] = useState(DEFAULT_ROWS)
   const [cols] = useState(DEFAULT_COLS)
 
@@ -133,6 +135,43 @@ export default function Vf2GridEditor({ sheet, celdas, puedeEditar, metricas, es
   // celdas guardadas para sobrevivir refresh.
   const [rowConfigs, setRowConfigs] = useState<RowConfig[]>(() => reconstructRowConfigs(celdas, DEFAULT_ROWS))
   const [colConfigs, setColConfigs] = useState<ColConfig[]>(() => reconstructColConfigs(celdas, DEFAULT_COLS))
+
+  // Carga de plantilla predefinida (GRI/NCG)
+  const [isLoadingTemplate, startLoadTemplate] = useTransition()
+  const [templateError, setTemplateError] = useState<string | null>(null)
+  const [templateLoaded, setTemplateLoaded] = useState<string | null>(null)
+
+  function handleCargarTemplate() {
+    setTemplateError(null)
+    setTemplateLoaded(null)
+    startLoadTemplate(async () => {
+      const res = await vf2CargarTemplate(tareaPublicId)
+      if (!res.ok) {
+        setTemplateError(res.error)
+        return
+      }
+      // Actualizar catálogo y rowConfigs con las métricas del template
+      const nuevasMetricas: MetricaMin[] = []
+      const nextRowConfigs = [...rowConfigs]
+      for (const m of res.metricas as Vf2TemplateMetricaResult[]) {
+        if (m.rowIndex < nextRowConfigs.length) {
+          nextRowConfigs[m.rowIndex] = { metricId: m.metricId }
+        }
+        if (!catalogo.some(c => c.metric_id === m.metricId)) {
+          nuevasMetricas.push({
+            metric_id: m.metricId,
+            public_id: m.publicId,
+            codigo: m.codigo,
+            nombre: m.nombre,
+            unidad: m.unidad,
+          })
+        }
+      }
+      setRowConfigs(nextRowConfigs)
+      if (nuevasMetricas.length > 0) setCatalogo(prev => [...prev, ...nuevasMetricas])
+      setTemplateLoaded(res.templateTitulo)
+    })
+  }
 
   function handleCrearMetrica() {
     if (!mCodigo.trim() || !mNombre.trim()) {
@@ -457,6 +496,33 @@ export default function Vf2GridEditor({ sheet, celdas, puedeEditar, metricas, es
       {/* Panel de configuración de coordenadas */}
       {showConfig && puedeEditar && (
         <div className="border-b border-gray-3 bg-gray-1/60 px-4 py-3 space-y-3">
+
+          {/* Botón cargar plantilla predefinida */}
+          {esAdmin && tieneItemVinculado && (
+            <div className="flex items-center justify-between bg-primary-1/50 rounded-xl px-3 py-2 border border-primary-2">
+              <div>
+                <p className="text-xs font-medium text-primary-8">Plantilla predefinida</p>
+                <p className="text-xs text-primary-6">
+                  {templateLoaded
+                    ? `Cargada: ${templateLoaded}`
+                    : 'Auto-configura filas con métricas del estándar vinculado'}
+                </p>
+                {templateError && (
+                  <p className="text-xs text-critique-7 mt-0.5">{templateError}</p>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={handleCargarTemplate}
+                disabled={isLoadingTemplate}
+                className="flex items-center gap-1.5 text-xs bg-primary-5 hover:bg-primary-6 text-white px-3 py-1.5 rounded-lg font-medium disabled:opacity-50 transition-colors shrink-0 ml-3"
+              >
+                <Wand2 className="h-3.5 w-3.5" />
+                {isLoadingTemplate ? 'Cargando...' : templateLoaded ? 'Recargar' : 'Cargar plantilla'}
+              </button>
+            </div>
+          )}
+
           {/* Periodos por columna */}
           <div>
             <p className="text-xs font-medium text-gray-6 mb-1.5">
