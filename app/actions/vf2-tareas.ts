@@ -488,13 +488,19 @@ export async function vf2EliminarTarea(
     const actor = await requireAdmin()
     const supabase = await createClient()
 
-    // Anti-IDOR: verificar que la tarea pertenece a la empresa del actor
+    // Anti-IDOR: verificar que la tarea pertenece a la empresa del actor.
+    // El proyecto se obtiene vía la colección (vf2_tarea no tiene proyecto_id).
     const { data: tarea } = await supabase
       .from('vf2_tarea')
-      .select('tarea_id, proyecto_id')
+      .select('tarea_id, titulo, coleccion_id, vf2_coleccion(proyecto_id)')
       .eq('public_id', tareaPublicId)
       .eq('empresa_id', actor.empresaId)
-      .single()
+      .single<{
+        tarea_id: number
+        titulo: string
+        coleccion_id: number
+        vf2_coleccion: { proyecto_id: number } | null
+      }>()
 
     if (!tarea) return { ok: false, error: 'Tarea no encontrada' }
 
@@ -515,9 +521,9 @@ export async function vf2EliminarTarea(
       p_accion: 'DELETE_VF2_TAREA',
       p_tabla: 'vf2_tarea',
       p_registro_id: tareaPublicId,
-      p_datos_prev: { public_id: tareaPublicId },
+      p_datos_prev: { public_id: tareaPublicId, titulo: tarea.titulo },
       p_datos_new: null,
-      p_proyecto_id: tarea.proyecto_id,
+      p_proyecto_id: tarea.vf2_coleccion?.proyecto_id ?? null,
     })
 
     return { ok: true }
