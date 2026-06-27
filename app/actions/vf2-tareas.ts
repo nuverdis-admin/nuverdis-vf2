@@ -474,6 +474,58 @@ export async function vf2CrearSheet(input: {
   }
 }
 
+// ─── Eliminar tarea (admin, cascade) ─────────────────────────────────────────
+// Las FK con CASCADE limpian: vf2_sheet → vf2_cell, vf2_tarea_rol,
+// vf2_evidencia (fila BD; archivos Storage los limpia el pg_cron huérfanos),
+// vf2_comentario. Requiere admin de la misma empresa (anti-IDOR).
+
+export async function vf2EliminarTarea(
+  tareaPublicId: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!tareaPublicId) return { ok: false, error: 'Datos inválidos' }
+
+  try {
+    const actor = await requireAdmin()
+    const supabase = await createClient()
+
+    // Anti-IDOR: verificar que la tarea pertenece a la empresa del actor
+    const { data: tarea } = await supabase
+      .from('vf2_tarea')
+      .select('tarea_id, proyecto_id')
+      .eq('public_id', tareaPublicId)
+      .eq('empresa_id', actor.empresaId)
+      .single()
+
+    if (!tarea) return { ok: false, error: 'Tarea no encontrada' }
+
+    const { error } = await supabase
+      .from('vf2_tarea')
+      .delete()
+      .eq('public_id', tareaPublicId)
+      .eq('empresa_id', actor.empresaId)
+
+    if (error) {
+      console.error('[vf2EliminarTarea]', error.message)
+      return { ok: false, error: 'Error al eliminar la tarea' }
+    }
+
+    await supabase.rpc('log_usuario_accion', {
+      p_empresa_id: actor.empresaId,
+      p_user_id: actor.uid,
+      p_accion: 'DELETE_VF2_TAREA',
+      p_tabla: 'vf2_tarea',
+      p_registro_id: tareaPublicId,
+      p_datos_prev: { public_id: tareaPublicId },
+      p_datos_new: null,
+      p_proyecto_id: tarea.proyecto_id,
+    })
+
+    return { ok: true }
+  } catch {
+    return { ok: false, error: 'Error al procesar la solicitud' }
+  }
+}
+
 // ─── Cargar plantilla de grid (GRI / NCG) ────────────────────────────────────
 // Dado el public_id de una tarea, detecta su ítem vinculado (GRI o NCG),
 // encuentra el template predefinido, crea las métricas (ON CONFLICT DO NOTHING),

@@ -3,7 +3,8 @@
 
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
-import { ChevronRight } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { ChevronRight, Trash2 } from 'lucide-react'
 import {
   vf2CanEditarCeldas,
   vf2CanIniciarPreparacion,
@@ -14,7 +15,7 @@ import {
   VF2_ESTADO_BADGE,
   VF2_ESTADO_LABEL,
 } from '@/lib/vf2/permisos'
-import { vf2CambiarEstado, vf2Aprobar } from '@/app/actions/vf2-tareas'
+import { vf2CambiarEstado, vf2Aprobar, vf2EliminarTarea } from '@/app/actions/vf2-tareas'
 import Vf2GridEditor from './Vf2GridEditor'
 import Vf2AccionesBar from './Vf2AccionesBar'
 import Vf2RolesPanel from './Vf2RolesPanel'
@@ -96,11 +97,27 @@ export default function Vf2TareaView({
   actorEmpresaId,
   itemInfo,
 }: Props) {
+  const router = useRouter()
   const [tarea, setTarea] = useState(tareaInit)
   const [roles, setRoles] = useState<Vf2TareaRolRow[]>(rolesInit)
   const [metrica, setMetrica] = useState<Vf2Metric | null>(metricaInit)
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [isDeleting, startDelete] = useTransition()
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+
+  function handleEliminar() {
+    setDeleteError(null)
+    startDelete(async () => {
+      const res = await vf2EliminarTarea(tarea.public_id)
+      if (!res.ok) {
+        setDeleteError(res.error)
+        return
+      }
+      router.push(`/dashboard/proyecto/${proyectoRef}/coleccion/${colRef}`)
+    })
+  }
 
   const rolApp = actorRolApp as 'administrador' | 'encargado' | 'revisor' | 'superadmin'
   const esAdmin = rolApp === 'administrador' || rolApp === 'superadmin'
@@ -176,7 +193,17 @@ export default function Vf2TareaView({
             </span>
           </div>
 
-          <Vf2AccionesBar
+          <div className="flex items-center gap-2">
+            {esAdmin && (
+              <button
+                onClick={() => setShowDeleteModal(true)}
+                title="Eliminar tarea"
+                className="p-1.5 text-gray-4 hover:text-critique-6 hover:bg-critique-1 rounded-lg transition-colors"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            )}
+            <Vf2AccionesBar
             estado={tarea.estado}
             isPending={isPending}
             puedeIniciarPreparacion={puedeIniciarPreparacion}
@@ -190,6 +217,7 @@ export default function Vf2TareaView({
             onAprobar={handleAprobar}
             onDevolver={(nota) => handleCambiarEstado('devuelta', nota)}
           />
+          </div>
         </div>
 
         {itemInfo && (
@@ -280,6 +308,46 @@ export default function Vf2TareaView({
         tareaAprobada={tarea.estado === 'aprobada'}
         onRolesUpdated={setRoles}
       />
+
+      {/* Modal confirmar eliminación */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-modal border-t-4 border-critique-6">
+            <h2 className="text-lg font-bold text-critique-7 mb-1">Eliminar tarea</h2>
+            <p className="text-sm text-gray-6 mb-1">
+              Esta acción eliminará permanentemente la tarea
+              <span className="font-semibold text-gray-8"> {tarea.titulo}</span> y todos sus datos asociados:
+            </p>
+            <ul className="text-xs text-gray-5 list-disc list-inside mb-4 space-y-0.5">
+              <li>Hoja de datos y celdas</li>
+              <li>Evidencias (archivos)</li>
+              <li>Comentarios y mensajes</li>
+              <li>Roles asignados</li>
+            </ul>
+            {deleteError && (
+              <p className="text-xs text-critique-7 bg-critique-1 px-3 py-2 rounded-lg mb-3">
+                {deleteError}
+              </p>
+            )}
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => { setShowDeleteModal(false); setDeleteError(null) }}
+                disabled={isDeleting}
+                className="btn-ghost rounded-lg text-sm px-4 py-2"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleEliminar}
+                disabled={isDeleting}
+                className="bg-critique-6 hover:bg-critique-7 text-white rounded-lg text-sm px-4 py-2 font-medium transition-colors disabled:opacity-50"
+              >
+                {isDeleting ? 'Eliminando...' : 'Eliminar tarea'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

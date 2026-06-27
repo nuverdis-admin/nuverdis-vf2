@@ -38,6 +38,7 @@ export default function Vf2CrearTareaModal({ coleccionPublicId, proyectoRef, est
   const [ncgItemId, setNcgItemId] = useState<number | null>(null)
   const [griItems, setGriItems] = useState<GriItem[]>([])
   const [ncgItems, setNcgItems] = useState<NcgItem[]>([])
+  const [itemsConTabla, setItemsConTabla] = useState<Set<number>>(new Set())
   const [error, setError] = useState<string | null>(null)
 
   // Cargar items del estándar cuando se abre el modal
@@ -45,17 +46,35 @@ export default function Vf2CrearTareaModal({ coleccionPublicId, proyectoRef, est
     if (!open) return
     const supabase = createClient()
     if (estandar === 'GRI') {
-      supabase
-        .from('gri_items_reporte')
-        .select('id, estandar, jerarquia_1_nombre, jerarquia_2_nombre')
-        .order('id', { ascending: true })
-        .then((res: { data: GriItem[] | null }) => setGriItems(res.data ?? []))
+      Promise.all([
+        supabase
+          .from('gri_items_reporte')
+          .select('id, estandar, jerarquia_1_nombre, jerarquia_2_nombre')
+          .order('id', { ascending: true }),
+        supabase
+          .from('gri_items_requerimientos_reporte')
+          .select('item_id')
+          .not('tabla', 'is', null),
+      ]).then(([items, tablas]) => {
+        setGriItems((items.data as GriItem[] | null) ?? [])
+        const ids = new Set<number>(((tablas.data as { item_id: number }[] | null) ?? []).map(r => r.item_id))
+        setItemsConTabla(ids)
+      })
     } else if (estandar === 'NCG') {
-      supabase
-        .from('ncg_items_reporte')
-        .select('id, estandar_nombre, jerarquia_1, jerarquia_1_nombre, jerarquia_2_nombre')
-        .order('id', { ascending: true })
-        .then((res: { data: NcgItem[] | null }) => setNcgItems(res.data ?? []))
+      Promise.all([
+        supabase
+          .from('ncg_items_reporte')
+          .select('id, estandar_nombre, jerarquia_1, jerarquia_1_nombre, jerarquia_2_nombre')
+          .order('id', { ascending: true }),
+        supabase
+          .from('ncg_items_requerimientos_reporte')
+          .select('item_id')
+          .not('tabla', 'is', null),
+      ]).then(([items, tablas]) => {
+        setNcgItems((items.data as NcgItem[] | null) ?? [])
+        const ids = new Set<number>(((tablas.data as { item_id: number }[] | null) ?? []).map(r => r.item_id))
+        setItemsConTabla(ids)
+      })
     }
   }, [open, estandar])
 
@@ -139,10 +158,15 @@ export default function Vf2CrearTareaModal({ coleccionPublicId, proyectoRef, est
                     <option value="">Sin vincular</option>
                     {griItems.map(item => (
                       <option key={item.id} value={item.id}>
-                        {item.estandar} — {item.jerarquia_1_nombre}{item.jerarquia_2_nombre ? ` / ${item.jerarquia_2_nombre}` : ''}
+                        {itemsConTabla.has(item.id) ? '(T) ' : ''}{item.estandar} — {item.jerarquia_1_nombre}{item.jerarquia_2_nombre ? ` / ${item.jerarquia_2_nombre}` : ''}
                       </option>
                     ))}
                   </select>
+                  {itemsConTabla.size > 0 && (
+                    <p className="text-xs text-gray-4 italic mt-1">
+                      * (T) indica que este ítem tiene una plantilla de tabla predefinida disponible.
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -159,10 +183,15 @@ export default function Vf2CrearTareaModal({ coleccionPublicId, proyectoRef, est
                     <option value="">Sin vincular</option>
                     {ncgItems.map(item => (
                       <option key={item.id} value={item.id}>
-                        {item.jerarquia_1} {item.jerarquia_1_nombre}{item.jerarquia_2_nombre ? ` / ${item.jerarquia_2_nombre}` : ''}
+                        {itemsConTabla.has(item.id) ? '(T) ' : ''}{item.jerarquia_1} {item.jerarquia_1_nombre}{item.jerarquia_2_nombre ? ` / ${item.jerarquia_2_nombre}` : ''}
                       </option>
                     ))}
                   </select>
+                  {itemsConTabla.size > 0 && (
+                    <p className="text-xs text-gray-4 italic mt-1">
+                      * (T) indica que este ítem tiene una plantilla de tabla predefinida disponible.
+                    </p>
+                  )}
                 </div>
               )}
 
