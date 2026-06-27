@@ -79,6 +79,33 @@ function makeDefaultColConfigs(n: number): ColConfig[] {
   return Array.from({ length: n }, (_, i) => ({ year: currentYear - (n - 1 - i) }))
 }
 
+// Reconstruye la coordenada métrica↔fila desde el `validation` de las celdas ya
+// guardadas, para que el panel de Coordenadas sobreviva a un refresh (la config no
+// es estado efímero: vive en cada celda persistida).
+function reconstructRowConfigs(celdas: Vf2Cell[], nRows: number): RowConfig[] {
+  const cfgs = makeDefaultRowConfigs(nRows)
+  for (const c of celdas) {
+    const metricId = c.validation?.metric_id
+    if (!metricId) continue
+    const ri = parseInt(c.row_key.replace('r', ''), 10)
+    if (ri >= 0 && ri < nRows) cfgs[ri] = { metricId }
+  }
+  return cfgs
+}
+
+// Reconstruye la coordenada año↔columna desde `validation.periodo_inicio`.
+function reconstructColConfigs(celdas: Vf2Cell[], nCols: number): ColConfig[] {
+  const cfgs = makeDefaultColConfigs(nCols)
+  for (const c of celdas) {
+    const periodo = c.validation?.periodo_inicio
+    if (!periodo) continue
+    const ci = parseInt(c.col_key.replace('c', ''), 10)
+    const year = parseInt(String(periodo).slice(0, 4), 10)
+    if (ci >= 0 && ci < nCols && !Number.isNaN(year)) cfgs[ci] = { year }
+  }
+  return cfgs
+}
+
 export default function Vf2GridEditor({ sheet, celdas, puedeEditar, metricas, esAdmin }: Props) {
   const [rows] = useState(DEFAULT_ROWS)
   const [cols] = useState(DEFAULT_COLS)
@@ -102,9 +129,10 @@ export default function Vf2GridEditor({ sheet, celdas, puedeEditar, metricas, es
   const [mError, setMError] = useState<string | null>(null)
   const [isCreatingMetrica, startCrearMetrica] = useTransition()
 
-  // Configuración de coordenadas por fila y columna (A1)
-  const [rowConfigs, setRowConfigs] = useState<RowConfig[]>(() => makeDefaultRowConfigs(DEFAULT_ROWS))
-  const [colConfigs, setColConfigs] = useState<ColConfig[]>(() => makeDefaultColConfigs(DEFAULT_COLS))
+  // Configuración de coordenadas por fila y columna (A1) — reconstruida desde las
+  // celdas guardadas para sobrevivir refresh.
+  const [rowConfigs, setRowConfigs] = useState<RowConfig[]>(() => reconstructRowConfigs(celdas, DEFAULT_ROWS))
+  const [colConfigs, setColConfigs] = useState<ColConfig[]>(() => reconstructColConfigs(celdas, DEFAULT_COLS))
 
   function handleCrearMetrica() {
     if (!mCodigo.trim() || !mNombre.trim()) {

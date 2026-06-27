@@ -402,7 +402,8 @@ export async function vf2CrearMetrica(
       return { ok: false, error: 'Error al crear métrica' }
     }
 
-    revalidatePath('/dashboard/proyecto', 'layout')
+    // Sin revalidatePath: el catálogo se actualiza en cliente (evita una carrera de
+    // refresh que obligaba a F5). El alta queda persistida y aparece al navegar.
     return {
       ok: true,
       metricPublicId: data.public_id,
