@@ -8,6 +8,14 @@ import { Hash, Plus, X, Check } from 'lucide-react'
 import { vf2CrearMetrica } from '@/app/actions/vf2-tareas'
 import type { Vf2Metric } from '@/lib/vf2/types'
 
+interface MetricaCatalogoMin {
+  metric_id: number
+  public_id: string
+  codigo: string
+  nombre: string
+  unidad: string | null
+}
+
 interface Props {
   metrica: Vf2Metric | null
   griItemId: number | null
@@ -15,6 +23,7 @@ interface Props {
   tareaPublicId: string
   esAdmin: boolean
   onMetricaCreada: (metrica: Vf2Metric) => void
+  onMetricaCatalogo?: (metrica: MetricaCatalogoMin) => void
 }
 
 export default function Vf2MetricaBadge({
@@ -23,6 +32,7 @@ export default function Vf2MetricaBadge({
   ncgItemId,
   esAdmin,
   onMetricaCreada,
+  onMetricaCatalogo,
 }: Props) {
   const [metrica, setMetrica] = useState<Vf2Metric | null>(metricaInit)
   const [showForm, setShowForm] = useState(false)
@@ -50,9 +60,9 @@ export default function Vf2MetricaBadge({
       })
       if (res.ok) {
         const nueva: Vf2Metric = {
-          metric_id: 0,
+          metric_id: res.metrica.metric_id,
           empresa_id: 0,
-          public_id: res.metricPublicId,
+          public_id: res.metrica.public_id,
           codigo,
           nombre,
           descripcion: null,
@@ -70,6 +80,14 @@ export default function Vf2MetricaBadge({
         }
         setMetrica(nueva)
         onMetricaCreada(nueva)
+        // Reflejar el alta en el catálogo compartido del grid sin recargar
+        onMetricaCatalogo?.({
+          metric_id: res.metrica.metric_id,
+          public_id: res.metrica.public_id,
+          codigo: res.metrica.codigo,
+          nombre: res.metrica.nombre,
+          unidad: res.metrica.unidad,
+        })
         setShowForm(false)
       } else {
         setError(res.error)

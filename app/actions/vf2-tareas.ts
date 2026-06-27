@@ -568,38 +568,38 @@ export async function vf2CargarTemplate(
 
     if (!tarea) return { ok: false, error: 'Tarea no encontrada' }
 
-    // Importar helpers de templates en servidor (no expone datos al cliente)
-    const { extractItemCode, findTemplateByGriCode, findTemplateByNcgCode } =
-      await import('@/lib/vf2/templates/index')
+    // Importar helper de templates en servidor (no expone datos al cliente)
+    const { findTemplateByTablaCodes } = await import('@/lib/vf2/templates/index')
 
+    // La plantilla se resuelve por la columna `tabla` (identificador vf1: T8, T26,
+    // NCG-T3...), la MISMA que marca la "(T)" en el modal. No por el nombre del ítem
+    // (los nombres son descriptivos, sin código numérico).
     let template = null
 
-    // Buscar template por ítem GRI
     if (tarea.gri_item_id) {
-      const { data: item } = await supabase
-        .from('gri_items_reporte')
-        .select('jerarquia_2_nombre')
-        .eq('id', tarea.gri_item_id)
-        .single()
+      const { data: reqs } = await supabase
+        .from('gri_items_requerimientos_reporte')
+        .select('tabla')
+        .eq('item_id', tarea.gri_item_id)
+        .not('tabla', 'is', null)
 
-      if (item?.jerarquia_2_nombre) {
-        const code = extractItemCode(item.jerarquia_2_nombre)
-        if (code) template = findTemplateByGriCode(code)
-      }
+      const codes = (reqs ?? [])
+        .map(r => (r as { tabla: string | null }).tabla)
+        .filter((t): t is string => !!t)
+      if (codes.length) template = findTemplateByTablaCodes(codes)
     }
 
-    // Buscar template por ítem NCG
     if (!template && tarea.ncg_item_id) {
-      const { data: item } = await supabase
-        .from('ncg_items_reporte')
-        .select('jerarquia_2_nombre')
-        .eq('id', tarea.ncg_item_id)
-        .single()
+      const { data: reqs } = await supabase
+        .from('ncg_items_requerimientos_reporte')
+        .select('tabla')
+        .eq('item_id', tarea.ncg_item_id)
+        .not('tabla', 'is', null)
 
-      if (item?.jerarquia_2_nombre) {
-        const code = extractItemCode(item.jerarquia_2_nombre)
-        if (code) template = findTemplateByNcgCode(code)
-      }
+      const codes = (reqs ?? [])
+        .map(r => (r as { tabla: string | null }).tabla)
+        .filter((t): t is string => !!t)
+      if (codes.length) template = findTemplateByTablaCodes(codes)
     }
 
     if (!template) {

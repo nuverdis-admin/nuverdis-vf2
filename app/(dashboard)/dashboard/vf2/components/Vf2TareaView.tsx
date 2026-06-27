@@ -101,6 +101,16 @@ export default function Vf2TareaView({
   const [tarea, setTarea] = useState(tareaInit)
   const [roles, setRoles] = useState<Vf2TareaRolRow[]>(rolesInit)
   const [metrica, setMetrica] = useState<Vf2Metric | null>(metricaInit)
+  // Catálogo de métricas compartido entre el grid y el badge (fuente única).
+  const [catalogo, setCatalogo] = useState<MetricaMin[]>(metricas)
+
+  function añadirMetricas(nuevas: MetricaMin[]) {
+    setCatalogo(prev => {
+      const ids = new Set(prev.map(m => m.metric_id))
+      const add = nuevas.filter(m => !ids.has(m.metric_id))
+      return add.length ? [...prev, ...add] : prev
+    })
+  }
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
@@ -246,6 +256,7 @@ export default function Vf2TareaView({
             tareaPublicId={tarea.public_id}
             esAdmin={esAdmin}
             onMetricaCreada={setMetrica}
+            onMetricaCatalogo={(m) => añadirMetricas([m])}
           />
         </div>
 
@@ -264,9 +275,10 @@ export default function Vf2TareaView({
             celdas={celdas}
             puedeEditar={puedeEditar}
             tareaPublicId={tarea.public_id}
-            metricas={metricas}
+            metricas={catalogo}
             esAdmin={esAdmin}
             tieneItemVinculado={!!(tarea.gri_item_id ?? tarea.ncg_item_id)}
+            onMetricasCreadas={añadirMetricas}
           />
         ) : (
           <div className="flex items-center justify-center h-full">

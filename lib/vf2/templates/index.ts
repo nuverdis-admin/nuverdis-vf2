@@ -592,3 +592,53 @@ export function extractItemCode(itemName: string): string | null {
   const match = itemName.match(/^(\d[\d\-.]*)/)
   return match ? match[1] : null
 }
+
+/**
+ * Mapeo del identificador de tabla de vf1 (columna `tabla` de
+ * `*_items_requerimientos_reporte`) → id de plantilla vf2. Esta es la fuente de
+ * verdad para cargar plantillas: la misma columna `tabla` que marca la "(T)" en
+ * el modal de crear tarea. Un mismo indicador puede tener varias sub-tablas
+ * (ej. extracción de agua = T8/T9/T10) que apuntan a la misma plantilla.
+ */
+const TABLA_CODE_TO_TEMPLATE_ID: Record<string, string> = {
+  // GRI
+  T1: 'gri-2-7', T2: 'gri-2-7',
+  T22: 'gri-102-3', T23: 'gri-102-3', T24: 'gri-102-3', T25: 'gri-102-3',
+  T7: 'gri-205-2', T20: 'gri-205-2', T21: 'gri-205-2',
+  T8: 'gri-303-3', T9: 'gri-303-3', T10: 'gri-303-3',
+  T11: 'gri-303-4', T12: 'gri-303-4', T13: 'gri-303-4',
+  T14: 'gri-303-5', T14b: 'gri-303-5',
+  T26: 'gri-305-1', T27: 'gri-305-2', T28: 'gri-305-3',
+  T15: 'gri-306-3', T16: 'gri-306-4', T17: 'gri-306-5',
+  T18: 'gri-401-1', T19: 'gri-401-1',
+  T6: 'gri-404-1',
+  T4: 'gri-405-1', T5: 'gri-405-1',
+  // NCG
+  'NCG-T1-T2': 'ncg-5-directorio',
+  'NCG-T3': 'ncg-5-dotacion',
+  'NCG-T4': 'ncg-5-1-2-nacionalidad',
+  'NCG-T5': 'ncg-5-1-3-edad',
+  'NCG-T6': 'ncg-5-1-4-antiguedad',
+  'NCG-T7': 'ncg-5-discapacidad',
+  'NCG-T8': 'ncg-5-contrato',
+  'NCG-T9': 'ncg-5-jornada',
+  'NCG-T10': 'ncg-5-brecha',
+  'NCG-T11': 'ncg-5-seguridad',
+  'NCG-T12': 'ncg-5-capacitacion',
+  'NCG-T13': 'ncg-5-horas-formacion',
+}
+
+/**
+ * Encuentra la plantilla vf2 a partir de uno o varios códigos de tabla vf1.
+ * Devuelve la primera coincidencia (un ítem = un indicador = una plantilla).
+ */
+export function findTemplateByTablaCodes(codes: string[]): Vf2Template | null {
+  for (const code of codes) {
+    const id = TABLA_CODE_TO_TEMPLATE_ID[code]
+    if (id) {
+      const tpl = VF2_TEMPLATES.find(t => t.id === id)
+      if (tpl) return tpl
+    }
+  }
+  return null
+}

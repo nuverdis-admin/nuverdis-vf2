@@ -41,6 +41,7 @@ interface Props {
   metricas: MetricaMin[]
   esAdmin: boolean
   tieneItemVinculado?: boolean
+  onMetricasCreadas?: (nuevas: MetricaMin[]) => void
 }
 
 type ColabStatus = 'connecting' | 'connected' | 'degraded' | 'readonly'
@@ -108,7 +109,7 @@ function reconstructColConfigs(celdas: Vf2Cell[], nCols: number): ColConfig[] {
   return cfgs
 }
 
-export default function Vf2GridEditor({ sheet, celdas, puedeEditar, metricas, esAdmin, tieneItemVinculado, tareaPublicId }: Props) {
+export default function Vf2GridEditor({ sheet, celdas, puedeEditar, metricas, esAdmin, tieneItemVinculado, tareaPublicId, onMetricasCreadas }: Props) {
   const [rows] = useState(DEFAULT_ROWS)
   const [cols] = useState(DEFAULT_COLS)
 
@@ -119,8 +120,9 @@ export default function Vf2GridEditor({ sheet, celdas, puedeEditar, metricas, es
   const [isDirty, setIsDirty] = useState(false)
   const [showConfig, setShowConfig] = useState(false)
 
-  // Catálogo de métricas de la empresa — estado local para reflejar altas sin recargar.
-  const [catalogo, setCatalogo] = useState<MetricaMin[]>(metricas)
+  // Catálogo controlado por el padre (Vf2TareaView): fuente única compartida con
+  // el badge de métrica. Las altas se notifican vía onMetricasCreadas.
+  const catalogo = metricas
 
   // Formulario inline "+ nueva métrica" (solo admin)
   const [showMetricaForm, setShowMetricaForm] = useState(false)
@@ -168,7 +170,7 @@ export default function Vf2GridEditor({ sheet, celdas, puedeEditar, metricas, es
         }
       }
       setRowConfigs(nextRowConfigs)
-      if (nuevasMetricas.length > 0) setCatalogo(prev => [...prev, ...nuevasMetricas])
+      if (nuevasMetricas.length > 0) onMetricasCreadas?.(nuevasMetricas)
       setTemplateLoaded(res.templateTitulo)
     })
   }
@@ -187,9 +189,7 @@ export default function Vf2GridEditor({ sheet, celdas, puedeEditar, metricas, es
         unidad: mUnidad.trim() || undefined,
       })
       if (res.ok) {
-        setCatalogo(prev =>
-          prev.some(m => m.metric_id === res.metrica.metric_id) ? prev : [...prev, res.metrica]
-        )
+        onMetricasCreadas?.([res.metrica])
         setMCodigo('')
         setMNombre('')
         setMUnidad('')
